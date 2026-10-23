@@ -1,0 +1,849 @@
+
+/* =========================================
+   DATA MBA — NEW CONNECTION
+   Clean, compact, viewport-fit layout
+========================================= */
+
+.new-connection-page {
+  width: 100%;
+  height: calc(100vh - 20px);
+  min-height: 0;
+  padding: 12px 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f5f7fb;
+  color: #17243b;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+/* Breadcrumb */
+.nc-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #7a879b;
+  font-size: 11px;
+}
+
+.nc-breadcrumb button,
+.nc-text-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2864df;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.nc-breadcrumb button:hover,
+.nc-text-button:hover {
+  color: #1749b5;
+}
+
+/* Page header */
+.nc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.nc-eyebrow {
+  margin-bottom: 4px;
+  color: #4775c9;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1.2px;
+}
+
+.nc-header h1 {
+  margin: 0 0 5px;
+  color: #17243b;
+  font-size: 24px;
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.nc-header p {
+  margin: 0;
+  color: #728097;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Buttons */
+.nc-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid #d8e0ec;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.nc-secondary {
+  background: #fff;
+  color: #34435b;
+}
+
+.nc-secondary:hover {
+  border-color: #b8c9e6;
+  background: #f0f4fa;
+}
+
+.nc-primary {
+  border-color: #2864df;
+  background: #2864df;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(40, 100, 223, 0.15);
+}
+
+.nc-primary:hover {
+  background: #1d51c1;
+}
+
+/* Connection type selection */
+.nc-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.nc-section-heading h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.nc-section-heading > span {
+  color: #8490a3;
+  font-size: 11px;
+}
+
+.nc-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.nc-type-card {
+  display: flex;
+  min-height: 190px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 18px;
+  border: 1px solid #e0e7f1;
+  border-radius: 11px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.nc-type-card:hover {
+  transform: translateY(-2px);
+  border-color: #8fb1f5;
+  box-shadow: 0 8px 20px rgba(31, 67, 125, 0.08);
+}
+
+.nc-type-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #edf3ff;
+  color: #2864df;
+  font-size: 21px;
+}
+
+.nc-icon-database {
+  background: #edf3ff;
+}
+
+.nc-icon-files {
+  background: #e8f8ef;
+  color: #138858;
+}
+
+.nc-icon-cloud-storage {
+  background: #f1eaff;
+  color: #8151d9;
+}
+
+.nc-type-category {
+  margin-top: 12px;
+  color: #78879d;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.nc-type-card > strong {
+  margin-top: 5px;
+  color: #1d2a40;
+  font-size: 14px;
+}
+
+.nc-type-description {
+  margin-top: 6px;
+  color: #78869b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.nc-card-action {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 12px;
+  color: #2864df;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.nc-card-action span {
+  font-size: 15px;
+}
+
+/* Security note on selection screen */
+.nc-security-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid #dce7ff;
+  border-radius: 10px;
+  background: #eff5ff;
+  color: #2864df;
+}
+
+.nc-security-note > span {
+  font-size: 20px;
+}
+
+.nc-security-note strong {
+  font-size: 11px;
+}
+
+.nc-security-note p {
+  margin: 4px 0 0;
+  color: #657895;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* Configuration layout fills remaining viewport */
+.nc-config-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  gap: 14px;
+  align-items: stretch;
+}
+
+/* Main form card: no internal scrollbar */
+.nc-form-card {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #dfe6f0;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(27, 48, 83, 0.035);
+}
+
+/* Form card heading */
+.nc-form-title {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 10px 17px;
+  border-bottom: 1px solid #e8edf5;
+  background: #fbfcff;
+}
+
+.nc-form-title .nc-type-icon {
+  width: 35px;
+  height: 35px;
+  border-radius: 9px;
+  font-size: 18px;
+}
+
+.nc-form-title h2 {
+  margin: 0 0 3px;
+  color: #192a43 !important;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.3;
+  opacity: 1 !important;
+}
+
+.nc-form-title p {
+  margin: 0;
+  color: #78869b;
+  font-size: 10px;
+}
+
+.nc-form-title .nc-text-button {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 10px;
+}
+
+/* Form sections */
+.nc-form-section {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 10px 17px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.nc-form-section h3 {
+  margin: 0 0 10px;
+  color: #253650;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+/* Fields */
+.nc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.nc-field:last-child {
+  margin-bottom: 0;
+}
+
+.nc-field label {
+  color: #354660;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.nc-field input,
+.nc-field select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border: 1px solid #dce3ee;
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: #25354d;
+  font-family: inherit;
+  font-size: 11px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nc-field input::placeholder {
+  color: #98a4b5;
+}
+
+.nc-field input:hover,
+.nc-field select:hover {
+  border-color: #b8c8e0;
+}
+
+.nc-field input:focus,
+.nc-field select:focus {
+  border-color: #5486ef;
+  box-shadow: 0 0 0 2px rgba(40, 100, 223, 0.1);
+}
+
+.nc-field small {
+  color: #8490a3;
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+/* File input */
+.nc-field input[type="file"] {
+  min-height: 34px;
+  padding: 4px;
+}
+
+.nc-field input[type="file"]::file-selector-button {
+  margin-right: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: #edf3ff;
+  color: #2864df;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.nc-file-selected {
+  margin-top: 7px;
+  color: #128454;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+/* Validation message */
+.nc-message {
+  flex-shrink: 0;
+  margin: 8px 17px 0;
+  padding: 8px 10px;
+  border: 1px solid #f1d49b;
+  border-radius: 6px;
+  background: #fff8e9;
+  color: #875914;
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Actions remain visible at card bottom */
+.nc-form-actions {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+  padding: 9px 17px;
+  border-top: 1px solid #e6ebf3;
+  background: #fff;
+}
+
+.nc-form-actions .nc-button {
+  min-width: 84px;
+  min-height: 33px;
+}
+
+/* Guidance panel */
+.nc-side-note {
+  align-self: start;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e0e7f1;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(27, 48, 83, 0.025);
+}
+
+.nc-side-note h3 {
+  margin: 0 0 9px;
+  color: #24354e;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.nc-side-note > p {
+  margin: 0 0 12px;
+  color: #75849b;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.nc-check-item {
+  margin: 9px 0;
+  color: #50627b;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.nc-check-item::first-letter {
+  color: #159765;
+}
+
+.nc-note-warning {
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid #f3e2c5;
+  border-radius: 8px;
+  background: #fff8ed;
+  color: #88622d;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+/* Focus accessibility */
+.nc-button:focus-visible,
+.nc-type-card:focus-visible,
+.nc-text-button:focus-visible,
+.nc-breadcrumb button:focus-visible {
+  outline: 2px solid rgba(40, 100, 223, 0.5);
+  outline-offset: 2px;
+}
+
+/* Short laptop screens */
+@media (max-height: 800px) and (min-width: 851px) {
+  .new-connection-page {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .nc-breadcrumb {
+    margin-bottom: 6px;
+  }
+
+  .nc-header {
+    margin-bottom: 8px;
+  }
+
+  .nc-header h1 {
+    font-size: 21px;
+  }
+
+  .nc-form-title {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .nc-form-section {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .nc-form-section h3 {
+    margin-bottom: 7px;
+  }
+
+  .nc-field {
+    gap: 3px;
+    margin-bottom: 5px;
+  }
+
+  .nc-field input,
+  .nc-field select {
+    min-height: 29px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .nc-side-note {
+    padding: 12px;
+  }
+
+  .nc-note-warning {
+    margin-top: 9px;
+    padding: 8px;
+  }
+}
+
+/* Tablet and mobile */
+@media (max-width: 850px) {
+  .new-connection-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+    padding: 16px;
+  }
+
+  .nc-header {
+    align-items: flex-start;
+  }
+
+  .nc-config-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    flex: initial;
+    min-height: initial;
+  }
+
+  .nc-form-card {
+    overflow: visible;
+  }
+
+  .nc-side-note {
+    order: 1;
+  }
+
+  .nc-type-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .new-connection-page {
+    padding: 12px;
+  }
+
+  .nc-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nc-header h1 {
+    font-size: 22px;
+  }
+
+  .nc-type-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nc-form-title {
+    flex-wrap: wrap;
+  }
+
+  .nc-form-title .nc-text-button {
+    margin-left: 0;
+  }
+
+  .nc-form-actions {
+    flex-wrap: wrap;
+  }
+
+  .nc-form-actions .nc-button {
+    flex: 1;
+  }
+}
+
+/* FINAL FIX: fit Salesforce configuration and buttons on screen */
+
+.new-connection-page {
+  height: 100%;
+  min-height: 0;
+  padding: 8px 18px;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.nc-breadcrumb {
+  margin-bottom: 6px;
+  line-height: 16px;
+}
+
+.nc-header {
+  margin-bottom: 9px;
+  gap: 10px;
+}
+
+.nc-eyebrow {
+  margin-bottom: 3px;
+}
+
+.nc-header h1 {
+  font-size: 22px;
+  line-height: 1.15;
+  margin-bottom: 3px;
+}
+
+.nc-header p {
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.nc-config-layout {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.nc-form-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Compact card header */
+.nc-form-title {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+}
+
+.nc-form-title .nc-type-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.nc-form-title h2 {
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.nc-form-title p {
+  font-size: 9px;
+}
+
+/* Compact form sections and fields */
+.nc-form-section {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+}
+
+.nc-form-section h3 {
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.nc-field {
+  gap: 2px;
+  margin-bottom: 5px;
+}
+
+.nc-field label {
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.nc-field input,
+.nc-field select {
+  min-height: 28px;
+  height: 28px;
+  padding: 4px 9px;
+  font-size: 10px;
+}
+
+.nc-field small {
+  font-size: 8px;
+  line-height: 1.2;
+}
+
+/* Keep action buttons fully visible */
+.nc-form-actions {
+  position: static;
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: 7px 14px;
+  gap: 8px;
+  background: #fff;
+}
+
+.nc-form-actions .nc-button {
+  min-height: 30px;
+  min-width: 78px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+/* Smaller guidance panel */
+.nc-side-note {
+  padding: 12px;
+}
+
+.nc-side-note h3 {
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+
+.nc-side-note > p {
+  font-size: 9px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.nc-check-item {
+  margin: 6px 0;
+  font-size: 9px;
+}
+
+.nc-note-warning {
+  margin-top: 9px;
+  padding: 8px;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+/* Short laptop displays */
+@media (max-height: 850px) and (min-width: 851px) {
+  .new-connection-page {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .nc-breadcrumb {
+    margin-bottom: 4px;
+  }
+
+  .nc-header {
+    margin-bottom: 6px;
+  }
+
+  .nc-header h1 {
+    font-size: 20px;
+  }
+
+  .nc-form-title {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .nc-form-section {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .nc-form-section h3 {
+    margin-bottom: 4px;
+  }
+
+  .nc-field {
+    margin-bottom: 3px;
+  }
+
+  .nc-field input,
+  .nc-field select {
+    height: 26px;
+    min-height: 26px;
+  }
+
+  .nc-form-actions {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+}
+
+/* Allow scrolling on smaller screens */
+@media (max-width: 850px) {
+  .new-connection-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .nc-config-layout {
+    flex: initial;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nc-form-card {
+    overflow: visible;
+  }
+
+  .nc-side-note {
+    position: static;
+  }
+}
