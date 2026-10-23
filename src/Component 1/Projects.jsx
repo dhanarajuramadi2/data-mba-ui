@@ -1,40 +1,8 @@
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useProjects } from './projectsStore';
+import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 import './Projects.css';
-
-const initialProjects = [
-  {
-    id: 1,
-    name: 'Change Healthcare Acquisition',
-    owner: 'Shivanand U',
-    source: 'Change Healthcare Source',
-    target: 'UnitedHealth Group Target',
-    status: 'Active',
-    timeline: 5,
-    priority: 'Medium',
-  },
-  {
-    id: 2,
-    name: 'DeepHealth migration',
-    owner: 'Shivanand U',
-    source: 'Source Connection',
-    target: 'Target Connection',
-    status: 'Active',
-    timeline: 16,
-    priority: 'High',
-  },
-  {
-    id: 3,
-    name: 'Legacy CRM Consolidation',
-    owner: 'Shivanand U',
-    source: 'Legacy CRM',
-    target: 'Salesforce',
-    status: 'Planning',
-    timeline: 10,
-    priority: 'Medium',
-  },
-];
 
 const emptyForm = {
   name: '',
@@ -45,8 +13,54 @@ const emptyForm = {
   priority: 'Medium',
 };
 
+const stamp = () => new Date().toLocaleString('en-US');
+
+function ProjectMenu({ project, onClose, onToggleStatus, onDuplicate, onDelete }) {
+  useCloseOnOutsideClick(true, onClose);
+  return (
+    <div className="project-options-menu ui-popup-menu" onClick={(event) => event.stopPropagation()}>
+      <button type="button" onClick={onToggleStatus}>
+        {project.status === 'Completed' ? '↺ Reopen project' : '✓ Mark as completed'}
+      </button>
+      <button type="button" onClick={onDuplicate}>⧉ Duplicate</button>
+      <button type="button" className="danger" onClick={onDelete}>✕ Delete project</button>
+    </div>
+  );
+}
+
 export default function Projects() {
   const [projects, setProjects] = useProjects();
+  const { notify, confirm } = useFeedback();
+  const [menuProjectId, setMenuProjectId] = useState(null);
+  const closeMenu = useCallback(() => setMenuProjectId(null), []);
+
+  const toggleStatus = (project) => {
+    const status = project.status === 'Completed' ? 'Active' : 'Completed';
+    setProjects((previous) =>
+      previous.map((item) => (item.id === project.id ? { ...item, status, updated: stamp() } : item))
+    );
+    notify(`${project.name} is now ${status.toLowerCase()}`, { type: 'success' });
+  };
+
+  const duplicateProject = (project) => {
+    setProjects((previous) => [
+      { ...project, id: Math.max(0, ...previous.map((item) => item.id || 0)) + 1, name: `${project.name} (copy)`, updated: stamp() },
+      ...previous,
+    ]);
+    notify(`Duplicated ${project.name}`, { type: 'success' });
+  };
+
+  const deleteProject = async (project) => {
+    const ok = await confirm({
+      title: `Delete ${project.name}?`,
+      message: 'The project is removed from this workspace.',
+      confirmLabel: 'Delete project',
+      danger: true,
+    });
+    if (!ok) return;
+    setProjects((previous) => previous.filter((item) => item.id !== project.id));
+    notify(`${project.name} deleted`);
+  };
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('recent');
   const [showModal, setShowModal] = useState(false);
@@ -187,14 +201,22 @@ export default function Projects() {
                   className="project-menu-button"
                   title="Project options"
                   aria-label={`Options for ${project.name}`}
-                  onClick={() =>
-                    window.alert(
-                      `Project: ${project.name}\nStatus: ${project.status}`
-                    )
-                  }
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuProjectId(menuProjectId === project.id ? null : project.id);
+                  }}
                 >
                   ⋮
                 </button>
+                {menuProjectId === project.id && (
+                  <ProjectMenu
+                    project={project}
+                    onClose={closeMenu}
+                    onToggleStatus={() => { closeMenu(); toggleStatus(project); }}
+                    onDuplicate={() => { closeMenu(); duplicateProject(project); }}
+                    onDelete={() => { closeMenu(); deleteProject(project); }}
+                  />
+                )}
               </div>
 
               <div className="project-metadata">

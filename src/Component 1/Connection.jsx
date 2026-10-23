@@ -1,15 +1,10 @@
 
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { Spinner } from './ui/Feedback';
+import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 import './Connection.css';
 
-const summaryCards = [
-  { icon: '▤', value: '10', label: 'Total connections', color: 'blue' },
-  { icon: '✓', value: '7', label: 'Connected', color: 'green' },
-  { icon: '⚠', value: '1', label: 'Attention needed', color: 'orange' },
-  { icon: '▣', value: '2', label: 'Archive targets', color: 'purple' },
-];
-
-const connections = [
+const initialConnections = [
   {
     alias: 'SF_PROD',
     type: 'Salesforce',
@@ -130,6 +125,23 @@ const filters = [
   { label: 'Files', category: 'Files' },
 ];
 
+
+const orgTypeToEnvironment = {
+  Production: 'Production',
+  Sandbox: 'Full sandbox',
+  'Developer Sandbox': 'Developer sandbox',
+  'Partial Sandbox': 'Partial sandbox',
+};
+
+// Simulated test outcome until a backend exists: the Oracle source is down,
+// expired tokens stay expired, everything else answers.
+function simulateTestResult(connection) {
+  if (connection.alias === 'ERP_ORACLE') return 'Unreachable';
+  if (connection.status === 'Token expired') return 'Token expired';
+  if (connection.category === 'Files') return connection.status;
+  return 'Connected';
+}
+
 function SummaryCard({ icon, value, label, color }) {
   return (
     <div className={`summary-card ${color}`}>
@@ -142,7 +154,39 @@ function SummaryCard({ icon, value, label, color }) {
   );
 }
 
-function ConnectionsHeader({ onNewConnection }) {
+function ConnectionsHeader({
+  connections,
+  onNewConnection,
+  onTestAll,
+  testingAll,
+  onImport,
+}) {
+  const fileInputRef = useRef(null);
+
+  const summaryCards = [
+    { icon: '▤', value: connections.length, label: 'Total connections', color: 'blue' },
+    {
+      icon: '✓',
+      value: connections.filter((item) => item.status === 'Connected').length,
+      label: 'Connected',
+      color: 'green',
+    },
+    {
+      icon: '⚠',
+      value: connections.filter((item) =>
+        ['Token expired', 'Unreachable'].includes(item.status)
+      ).length,
+      label: 'Attention needed',
+      color: 'orange',
+    },
+    {
+      icon: '▣',
+      value: connections.filter((item) => item.environment === 'Archive target').length,
+      label: 'Archive targets',
+      color: 'purple',
+    },
+  ];
+
   return (
     <>
       <header className="connections-header">
@@ -155,21 +199,43 @@ function ConnectionsHeader({ onNewConnection }) {
         </div>
 
         <div className="header-actions">
-          <button className="button button-secondary">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onImport(file);
+              event.target.value = '';
+            }}
+          />
+
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <span>⇧</span> Import from file
           </button>
 
-          <button className="button button-secondary">
-            <span>▷</span> Test all
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={onTestAll}
+            disabled={testingAll}
+          >
+            {testingAll ? <Spinner /> : <span>▷</span>}
+            {testingAll ? 'Testing…' : 'Test all'}
           </button>
 
           <button
-          type="button"
-          className="button button-primary"
-          onClick={() => onNewConnection()}
-        >
-          <span>＋</span> New connection
-        </button>
+            type="button"
+            className="button button-primary"
+            onClick={() => onNewConnection()}
+          >
+            <span>＋</span> New connection
+          </button>
         </div>
       </header>
 
@@ -183,6 +249,7 @@ function ConnectionsHeader({ onNewConnection }) {
 }
 
 function FilterBar({
+  connections,
   activeFilter,
   setActiveFilter,
   search,
@@ -246,13 +313,24 @@ function EnvironmentBadge({ environment }) {
   );
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, busy }) {
+  if (busy) {
+    return (
+      <span className="status-badge status-testing">
+        <Spinner />
+        {busy}
+      </span>
+    );
+  }
+
   let className = 'status-connected';
 
   if (status === 'Token expired') {
     className = 'status-warning';
   } else if (status === 'Unreachable') {
     className = 'status-error';
+  } else if (status === 'Not tested') {
+    className = 'status-neutral';
   }
 
   return (
@@ -278,13 +356,20 @@ function ProviderIcon({ connection }) {
 function ConnectionRow({
   connection,
   selected,
+  flash,
+  busy,
   onSelect,
-  openMenu,
-  setOpenMenu,
+  menuOpen,
+  onToggleMenu,
+  onTest,
+  onEdit,
+  onClone,
+  onDelete,
+  onReauth,
 }) {
   return (
     <tr
-      className={selected ? 'selected-row' : ''}
+      className={`${selected ? 'selected-row' : ''} ${flash ? 'ui-row-flash' : ''}`}
       onClick={onSelect}
     >
       <td>
@@ -310,16 +395,14 @@ function ConnectionRow({
 
       <td>
         <div className="status-cell">
-          <StatusBadge status={connection.status} />
+          <StatusBadge status={connection.status} busy={busy} />
 
-          {connection.status === 'Token expired' && (
+          {connection.status === 'Token expired' && !busy && (
             <button
               className="reauth-link"
               onClick={(event) => {
                 event.stopPropagation();
-                alert(
-                  `Re-authentication requested for ${connection.alias}`
-                );
+                onReauth();
               }}
             >
               Re-authenticate
@@ -334,43 +417,22 @@ function ConnectionRow({
           aria-label={`Actions for ${connection.alias}`}
           onClick={(event) => {
             event.stopPropagation();
-            setOpenMenu(
-              openMenu === connection.alias
-                ? null
-                : connection.alias
-            );
+            onToggleMenu();
           }}
         >
           ⋮
         </button>
 
-        {openMenu === connection.alias && (
-          <div className="row-action-menu">
-            <button
-              onClick={() => {
-                setOpenMenu(null);
-                onSelect();
-              }}
-            >
-              View details
-            </button>
-
-            <button
-              onClick={() => {
-                setOpenMenu(null);
-                alert(`Test requested for ${connection.alias}`);
-              }}
-            >
+        {menuOpen && (
+          <div className="row-action-menu ui-popup-menu">
+            <button onClick={onSelect}>View details</button>
+            <button onClick={onTest} disabled={Boolean(busy)}>
               Test connection
             </button>
-
-            <button
-              onClick={() => {
-                setOpenMenu(null);
-                alert(`Edit ${connection.alias}`);
-              }}
-            >
-              Edit connection
+            <button onClick={onEdit}>Edit connection</button>
+            <button onClick={onClone}>Clone</button>
+            <button className="row-action-danger" onClick={onDelete}>
+              Delete
             </button>
           </div>
         )}
@@ -443,7 +505,19 @@ function PermissionItem({ label, passed }) {
   );
 }
 
-function SelectedConnectionPanel({ connection }) {
+function SelectedConnectionPanel({
+  connection,
+  busy,
+  lastTested,
+  onTest,
+  onEdit,
+  onClone,
+  onDelete,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  useCloseOnOutsideClick(menuOpen, closeMenu);
+
   if (!connection) {
     return (
       <aside className="details-panel">
@@ -477,13 +551,26 @@ function SelectedConnectionPanel({ connection }) {
           </div>
         </div>
 
-        <button
-          className="panel-more-button"
-          aria-label="More connection options"
-          onClick={() => alert(`More options for ${connection.alias}`)}
-        >
-          ⋯
-        </button>
+        <div className="panel-more-wrap">
+          <button
+            className="panel-more-button"
+            aria-label="More connection options"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            ⋯
+          </button>
+
+          {menuOpen && (
+            <div className="row-action-menu panel-more-menu ui-popup-menu">
+              <button onClick={onEdit}>Edit connection</button>
+              <button onClick={onClone}>Clone</button>
+              <button className="row-action-danger" onClick={onDelete}>
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <section className="details-section">
@@ -520,6 +607,7 @@ function SelectedConnectionPanel({ connection }) {
                 : connection.auth}
             </strong>
           </div>
+
         </div>
       </section>
 
@@ -576,29 +664,29 @@ function SelectedConnectionPanel({ connection }) {
       <div className="details-actions">
         <button
           className="button button-secondary"
-          onClick={() => alert(`Testing ${connection.alias}`)}
+          onClick={onTest}
+          disabled={Boolean(busy)}
+          title={lastTested ? `Last tested ${lastTested}` : 'Not tested in this session'}
         >
-          ▷ Test
+          {busy ? <Spinner /> : '▷'} {busy ? 'Testing…' : 'Test'}
         </button>
 
         <button
           className="button button-secondary"
-          onClick={() => alert(`Editing ${connection.alias}`)}
+          onClick={onEdit}
         >
           ✎ Edit
         </button>
 
         <button
           className="button button-secondary clone-button"
-          onClick={() =>
-            alert(`Clone ${connection.alias} to another org`)
-          }
+          onClick={onClone}
         >
           ▢ Clone to another org
         </button>
       </div>
 
-      {!isConnected && (
+      {!isConnected && !busy && (
         <p className="details-warning">
           This connection requires attention: {connection.status}.
         </p>
@@ -607,13 +695,12 @@ function SelectedConnectionPanel({ connection }) {
   );
 }
 
-export default function Connection({ onNewConnection }) {
-  
-function NewConnectionModal({ onClose, onSave }) {
+function NewConnectionModal({ initial, onClose, onSave }) {
+  const isEdit = Boolean(initial);
   const [form, setForm] = useState({
     project: 'Change Healthcare Acquisition',
     status: 'Active',
-    name: '',
+    name: initial?.alias || '',
     orgType: 'Sandbox',
     connectionType: 'Source',
     username: '',
@@ -637,13 +724,14 @@ function NewConnectionModal({ onClose, onSave }) {
   function handleSubmit(event) {
     event.preventDefault();
 
-    if (
-      !form.name.trim() ||
-      !form.username.trim() ||
-      !form.password.trim()
-    ) {
+    const credentialsMissing =
+      !isEdit && (!form.username.trim() || !form.password.trim());
+
+    if (!form.name.trim() || credentialsMissing) {
       setError(
-        'Please enter the connection name, username, and password.'
+        isEdit
+          ? 'Please enter the connection name.'
+          : 'Please enter the connection name, username, and password.'
       );
       return;
     }
@@ -659,13 +747,16 @@ function NewConnectionModal({ onClose, onSave }) {
           onClose();
         }
       }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose();
+      }}
     >
       <form
         className="connection-modal"
         onSubmit={handleSubmit}
       >
         <header className="connection-modal-header">
-          <h2>New Connection</h2>
+          <h2>{isEdit ? `Edit ${initial.alias}` : 'New Connection'}</h2>
 
           <button
             type="button"
@@ -713,6 +804,7 @@ function NewConnectionModal({ onClose, onSave }) {
                   value={form.name}
                   onChange={handleChange}
                   placeholder="Enter connection name"
+                  autoFocus
                   required
                 />
               </label>
@@ -764,30 +856,30 @@ function NewConnectionModal({ onClose, onSave }) {
             <div className="connection-form-grid">
               <label className="connection-field">
                 <span>
-                  Username <b>*</b>
+                  Username {!isEdit && <b>*</b>}
                 </span>
                 <input
                   name="username"
                   value={form.username}
                   onChange={handleChange}
-                  placeholder="Enter username"
+                  placeholder={isEdit ? 'Leave blank to keep current' : 'Enter username'}
                   autoComplete="username"
-                  required
+                  required={!isEdit}
                 />
               </label>
 
               <label className="connection-field">
                 <span>
-                  Password <b>*</b>
+                  Password {!isEdit && <b>*</b>}
                 </span>
                 <input
                   type="password"
                   name="password"
                   value={form.password}
                   onChange={handleChange}
-                  placeholder="Enter password"
+                  placeholder={isEdit ? 'Leave blank to keep current' : 'Enter password'}
                   autoComplete="new-password"
-                  required
+                  required={!isEdit}
                 />
               </label>
 
@@ -830,7 +922,7 @@ function NewConnectionModal({ onClose, onSave }) {
             type="submit"
             className="connection-modal-save"
           >
-            Save Connection
+            {isEdit ? 'Save changes' : 'Save & test connection'}
           </button>
         </footer>
       </form>
@@ -838,11 +930,227 @@ function NewConnectionModal({ onClose, onSave }) {
   );
 }
 
+function timeNow() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+export default function Connection() {
+  const { notify, confirm } = useFeedback();
+
+  const [connections, setConnections] = useState(initialConnections);
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedAlias, setSelectedAlias] = useState('SF_UAT');
   const [openMenu, setOpenMenu] = useState(null);
-  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [modal, setModal] = useState(null); // null | { mode: 'create' } | { mode: 'edit', connection }
+  const [busy, setBusy] = useState({}); // alias -> 'Testing…' | 'Signing in…'
+  const [lastTested, setLastTested] = useState({});
+  const [flashAlias, setFlashAlias] = useState(null);
+
+  const closeMenu = useCallback(() => setOpenMenu(null), []);
+  useCloseOnOutsideClick(Boolean(openMenu), closeMenu);
+
+  const updateConnection = (alias, changes) => {
+    setConnections((previous) =>
+      previous.map((item) => (item.alias === alias ? { ...item, ...changes } : item))
+    );
+  };
+
+  const highlight = (alias) => {
+    setSelectedAlias(alias);
+    setFlashAlias(alias);
+    window.setTimeout(() => setFlashAlias(null), 1600);
+  };
+
+  const runTest = (connection, { quiet = false } = {}) =>
+    new Promise((resolve) => {
+      setBusy((previous) => ({ ...previous, [connection.alias]: 'Testing…' }));
+
+      window.setTimeout(() => {
+        const result = simulateTestResult(connection);
+        updateConnection(connection.alias, { status: result });
+        setLastTested((previous) => ({ ...previous, [connection.alias]: `${timeNow()} · ${result}` }));
+        setBusy((previous) => {
+          const next = { ...previous };
+          delete next[connection.alias];
+          return next;
+        });
+
+        if (!quiet) {
+          if (result === 'Unreachable') {
+            notify(`${connection.alias} is unreachable`, {
+              type: 'error',
+              message: `Could not open a session to ${connection.endpoint}. Check the host, port and firewall.`,
+            });
+          } else if (result === 'Token expired') {
+            notify(`${connection.alias}: token expired`, {
+              type: 'warning',
+              message: 'Re-authenticate to refresh the OAuth token.',
+            });
+          } else {
+            notify(`${connection.alias} connected`, {
+              type: 'success',
+              message: `Responded in ${120 + Math.floor(Math.random() * 300)} ms.`,
+            });
+          }
+        }
+
+        resolve(result);
+      }, 900 + Math.random() * 900);
+    });
+
+  const testAll = async () => {
+    const results = await Promise.all(
+      connections.map((connection) => runTest(connection, { quiet: true }))
+    );
+    const failed = results.filter((result) => ['Unreachable', 'Token expired'].includes(result)).length;
+
+    notify(`Tested ${results.length} connections`, {
+      type: failed ? 'warning' : 'success',
+      message: failed
+        ? `${results.length - failed} passed · ${failed} need attention.`
+        : 'All connections responded.',
+    });
+  };
+
+  const reauthenticate = (connection) => {
+    setBusy((previous) => ({ ...previous, [connection.alias]: 'Signing in…' }));
+    window.setTimeout(() => {
+      updateConnection(connection.alias, { status: 'Connected' });
+      setBusy((previous) => {
+        const next = { ...previous };
+        delete next[connection.alias];
+        return next;
+      });
+      setLastTested((previous) => ({ ...previous, [connection.alias]: `${timeNow()} · Connected` }));
+      notify(`${connection.alias} re-authenticated`, {
+        type: 'success',
+        message: 'A fresh OAuth token was issued.',
+      });
+    }, 1400);
+  };
+
+  const uniqueAlias = (base) => {
+    let alias = base;
+    let counter = 2;
+    while (connections.some((item) => item.alias === alias)) {
+      alias = `${base}_${counter}`;
+      counter += 1;
+    }
+    return alias;
+  };
+
+  const cloneConnection = (connection) => {
+    const alias = uniqueAlias(`${connection.alias}_COPY`);
+    setConnections((previous) => {
+      const index = previous.findIndex((item) => item.alias === connection.alias);
+      const next = [...previous];
+      next.splice(index + 1, 0, { ...connection, alias, status: 'Not tested' });
+      return next;
+    });
+    highlight(alias);
+    notify(`Cloned as ${alias}`, {
+      type: 'success',
+      message: 'Credentials were not copied. Edit the clone to sign in.',
+    });
+  };
+
+  const deleteConnection = async (connection) => {
+    const isProd = connection.environment === 'Production';
+    const confirmed = await confirm({
+      title: `Delete ${connection.alias}?`,
+      message: isProd
+        ? 'This is a production connection. Jobs and migration plans that use it will stop working until you pick another connection.'
+        : 'Jobs and migration plans that use this connection will need a new one.',
+      confirmLabel: 'Delete connection',
+      danger: true,
+    });
+    if (!confirmed) return;
+
+    setConnections((previous) => previous.filter((item) => item.alias !== connection.alias));
+    if (selectedAlias === connection.alias) setSelectedAlias(null);
+    notify(`${connection.alias} deleted`, { type: 'info' });
+  };
+
+  const saveConnection = (form) => {
+    if (modal?.mode === 'edit') {
+      const original = modal.connection;
+      const alias = form.name.trim();
+      if (alias !== original.alias && connections.some((item) => item.alias === alias)) {
+        notify(`${alias} already exists`, { type: 'error', message: 'Choose a different connection name.' });
+        return;
+      }
+      setConnections((previous) =>
+        previous.map((item) => (item.alias === original.alias ? { ...item, alias } : item))
+      );
+      setModal(null);
+      highlight(alias);
+      notify('Connection updated', { type: 'success', message: alias });
+      return;
+    }
+
+    const alias = uniqueAlias(form.name.trim().toUpperCase().replace(/\s+/g, '_'));
+    const isProd = form.orgType === 'Production';
+    const newConnection = {
+      alias,
+      type: 'Salesforce',
+      environment: orgTypeToEnvironment[form.orgType] || form.orgType,
+      endpoint: isProd ? 'login.salesforce.com' : 'test.salesforce.com',
+      auth: 'Username / password',
+      status: 'Not tested',
+      category: 'Salesforce',
+      icon: '☁',
+      color: 'salesforce',
+    };
+
+    setConnections((previous) => [newConnection, ...previous]);
+    setActiveFilter('All');
+    setSearch('');
+    setModal(null);
+    highlight(alias);
+    runTest(newConnection);
+  };
+
+  const importConnections = async (file) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      const list = (Array.isArray(parsed) ? parsed : [parsed]).filter((item) => item?.alias);
+
+      if (!list.length) {
+        notify('Nothing to import', {
+          type: 'warning',
+          message: 'The file must contain connection objects with an "alias" field.',
+        });
+        return;
+      }
+
+      const existing = new Set(connections.map((item) => item.alias));
+      const added = list
+        .filter((item) => !existing.has(item.alias))
+        .map((item) => ({
+          type: 'Salesforce',
+          environment: 'Source',
+          endpoint: '—',
+          auth: '—',
+          category: 'Salesforce',
+          icon: '☁',
+          color: 'salesforce',
+          ...item,
+          status: 'Not tested',
+        }));
+
+      setConnections((previous) => [...added, ...previous]);
+      notify(`Imported ${added.length} connection${added.length === 1 ? '' : 's'}`, {
+        type: 'success',
+        message:
+          list.length > added.length
+            ? `${list.length - added.length} skipped because the alias already exists.`
+            : 'Run "Test all" to check them.',
+      });
+    } catch {
+      notify('Could not read file', { type: 'error', message: 'Choose a valid JSON file.' });
+    }
+  };
 
   const filteredConnections = connections.filter((connection) => {
     const matchesFilter =
@@ -867,12 +1175,38 @@ function NewConnectionModal({ onClose, onSave }) {
     return matchesFilter && matchesSearch;
   });
 
+  const selectedConnection = connections.find((item) => item.alias === selectedAlias);
+
+  const actionsFor = (connection) => ({
+    onTest: () => {
+      setOpenMenu(null);
+      runTest(connection);
+    },
+    onEdit: () => {
+      setOpenMenu(null);
+      setModal({ mode: 'edit', connection });
+    },
+    onClone: () => {
+      setOpenMenu(null);
+      cloneConnection(connection);
+    },
+    onDelete: () => {
+      setOpenMenu(null);
+      deleteConnection(connection);
+    },
+  });
+
   return (
     <div className="connections-page">
       <ConnectionsHeader
-        onNewConnection={() => setShowConnectionModal(true)}
+        connections={connections}
+        onNewConnection={() => setModal({ mode: 'create' })}
+        onTestAll={testAll}
+        testingAll={Object.keys(busy).length > 0}
+        onImport={importConnections}
       />
       <FilterBar
+        connections={connections}
         activeFilter={activeFilter}
         setActiveFilter={setActiveFilter}
         search={search}
@@ -902,18 +1236,35 @@ function NewConnectionModal({ onClose, onSave }) {
                       key={connection.alias}
                       connection={connection}
                       selected={selectedAlias === connection.alias}
-                      onSelect={() =>
-                        setSelectedAlias(connection.alias)
+                      flash={flashAlias === connection.alias}
+                      busy={busy[connection.alias]}
+                      onSelect={() => {
+                        setOpenMenu(null);
+                        setSelectedAlias(connection.alias);
+                      }}
+                      menuOpen={openMenu === connection.alias}
+                      onToggleMenu={() =>
+                        setOpenMenu(openMenu === connection.alias ? null : connection.alias)
                       }
-                      openMenu={openMenu}
-                      setOpenMenu={setOpenMenu}
+                      onReauth={() => reauthenticate(connection)}
+                      {...actionsFor(connection)}
                     />
                   ))}
 
                   {filteredConnections.length === 0 && (
                     <tr>
                       <td colSpan="7" className="empty-table">
-                        No connections found.
+                        No connections match your filters.{' '}
+                        <button
+                          type="button"
+                          className="reauth-link"
+                          onClick={() => {
+                            setSearch('');
+                            setActiveFilter('All');
+                          }}
+                        >
+                          Clear filters
+                        </button>
                       </td>
                     </tr>
                   )}
@@ -926,27 +1277,19 @@ function NewConnectionModal({ onClose, onSave }) {
         </div>
 
         <SelectedConnectionPanel
-          connection={connections.find(
-            (item) => item.alias === selectedAlias
-          )}
+          key={selectedAlias}
+          connection={selectedConnection}
+          busy={selectedConnection && busy[selectedConnection.alias]}
+          lastTested={selectedConnection && lastTested[selectedConnection.alias]}
+          {...(selectedConnection ? actionsFor(selectedConnection) : {})}
         />
-            </div>
+      </div>
 
-      {showConnectionModal && (
+      {modal && (
         <NewConnectionModal
-          onClose={() => setShowConnectionModal(false)}
-          onSave={(form) => {
-            console.log('New connection submitted:', {
-              ...form,
-              password: '[REDACTED]',
-              securityToken: '[REDACTED]',
-            });
-
-            setShowConnectionModal(false);
-            alert(
-              'Form validated. Backend integration is required to save the connection.'
-            );
-          }}
+          initial={modal.mode === 'edit' ? modal.connection : null}
+          onClose={() => setModal(null)}
+          onSave={saveConnection}
         />
       )}
     </div>

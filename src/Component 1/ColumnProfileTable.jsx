@@ -1,5 +1,6 @@
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 
 
 const columnsByObject = {
@@ -44,11 +45,23 @@ const columnsByObject = {
 
   const pageSize = 10;
 
-  export default function ColumnProfileTable({
-    onSelectColumn,
-    objectName = 'Account',
-    recordId = '',
-  }) {
+function ColumnMenu({ onClose, onShowMapping, onCopy }) {
+  useCloseOnOutsideClick(true, onClose);
+  return (
+    <div className="column-action-menu ui-popup-menu" onClick={(event) => event.stopPropagation()}>
+      <button type="button" onClick={onShowMapping}>Show value mapping</button>
+      <button type="button" onClick={onCopy}>Copy column name</button>
+    </div>
+  );
+}
+
+export default function ColumnProfileTable({
+  onSelectColumn,
+  objectName = 'Account',
+}) {
+  const { notify } = useFeedback();
+  const [menuColumn, setMenuColumn] = useState(null);
+  const closeMenu = useCallback(() => setMenuColumn(null), []);
   const columns = columnsByObject[objectName] || columnsByObject.Account;
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -66,7 +79,7 @@ const columnsByObject = {
         column.finding,
       ].some((value) => value.toLowerCase().includes(query))
     );
-  }, [search]);
+  }, [columns, search]);
 
   const pageCount = Math.max(
     1,
@@ -169,19 +182,37 @@ const columnsByObject = {
                     {column.finding}
                   </span>
                 </td>
-                <td>
+                <td className="column-row-menu-cell">
                   <button
                     type="button"
                     className="column-row-menu"
                     aria-label={`Actions for ${column.name}`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      setSelectedColumn(column.name);
-                      alert(`Actions for ${column.name}`);
+                      setMenuColumn(menuColumn === column.name ? null : column.name);
                     }}
                   >
                     ⋮
                   </button>
+                  {menuColumn === column.name && (
+                    <ColumnMenu
+                      onClose={closeMenu}
+                      onShowMapping={() => {
+                        setSelectedColumn(column.name);
+                        onSelectColumn?.(column.name);
+                        closeMenu();
+                      }}
+                      onCopy={async () => {
+                        closeMenu();
+                        try {
+                          await navigator.clipboard.writeText(column.name);
+                          notify(`Copied "${column.name}"`, { type: 'success', duration: 2000 });
+                        } catch {
+                          notify('Clipboard unavailable', { type: 'warning' });
+                        }
+                      }}
+                    />
+                  )}
                 </td>
               </tr>
             ))}

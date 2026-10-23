@@ -3516,3 +3516,27 @@ body,
   }
 }
 
+
+/* Job Library interactive additions */
+.job-row-menu button.danger { color: #b42318; }
+.job-row-menu button.danger:hover:not(:disabled) { background: #fee4e2; }
+.job-row-menu button:disabled { opacity: 0.45; cursor: not-allowed; }
+.job-row-menu button.active { color: #1d4fc4; font-weight: 600; }
+.job-result-badge .ui-spinner { width: 9px; height: 9px; margin-right: 3px; }
+.job-filter-settings-wrap { position: relative; flex-shrink: 0; }
+.job-library-filter-settings { position: relative; }
+.job-library-filter-settings.active { border-color: #2160e8; background: #e8efff; color: #1d4fc4; }
+.job-filter-dot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: #2160e8; }
+.job-filter-menu { top: 40px; right: 0; width: 170px; }
+.job-filter-menu button { display: flex; justify-content: space-between; align-items: center; }
+.job-filter-menu button span { color: #8a94a6; font-size: 11px; }
+.job-clear-filters { border: 0; background: transparent; color: #2160e8; text-decoration: underline; cursor: pointer; font: inherit; }
+.job-type-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.job-type-picker button {
+  padding: 7px 14px; border: 1px solid #d5dbe5; border-radius: 8px; background: #fff; color: #374151;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.job-type-picker button.active { border-color: #2160e8; background: #e8efff; color: #1d4fc4; }
+.job-type-picker button:disabled:not(.active) { opacity: 0.45; cursor: not-allowed; }
+.job-checkbox-line { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; cursor: pointer; }
+.job-run-profile-button:disabled { opacity: 0.55; cursor: not-allowed; }

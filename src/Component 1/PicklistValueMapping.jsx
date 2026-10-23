@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useFeedback } from './ui/feedbackContext';
 
 const mappings = [
   { source: 'United States', rows: '88,410', target: 'US', status: 'mapped' },
@@ -12,7 +13,9 @@ const mappings = [
 ];
 
 export default function PicklistValueMapping({ selectedColumn = 'country' }) {
+  const { notify } = useFeedback();
   const [accepted, setAccepted] = useState({});
+  const [created, setCreated] = useState(false);
   const [showRows, setShowRows] = useState(false);
 
   const isPicklist = ['country', 'industry', 'status'].includes(selectedColumn);
@@ -57,10 +60,13 @@ export default function PicklistValueMapping({ selectedColumn = 'country' }) {
                   type="button"
                   className={`picklist-target ${item.status}`}
                   onClick={() =>
-                    setAccepted((previous) => ({
-                      ...previous,
-                      [item.source]: !previous[item.source],
-                    }))
+                    {
+                      setCreated(false);
+                      setAccepted((previous) => ({
+                        ...previous,
+                        [item.source]: !previous[item.source],
+                      }));
+                    }
                   }
                 >
                   {accepted[item.source] ? 'Accepted' : item.target}
@@ -84,9 +90,29 @@ export default function PicklistValueMapping({ selectedColumn = 'country' }) {
         <button
           type="button"
           className="picklist-create-button"
-          onClick={() => alert(`Create value map for ${selectedColumn}`)}
+          onClick={() => {
+            if (!isPicklist) {
+              notify('Value maps are for picklist columns', {
+                type: 'info',
+                message: 'Pick country, industry or status to build one.',
+              });
+              return;
+            }
+            const suggestions = mappings.filter((item) => item.status === 'suggest');
+            const pending = suggestions.filter((item) => !accepted[item.source]);
+            const unmatched = mappings.filter((item) => item.status === 'error').length;
+            setAccepted((previous) => ({
+              ...previous,
+              ...Object.fromEntries(suggestions.map((item) => [item.source, true])),
+            }));
+            setCreated(true);
+            notify(`Value map created · ${selectedColumn}`, {
+              type: unmatched ? 'warning' : 'success',
+              message: `${mappings.length - unmatched} values mapped${pending.length ? ` (${pending.length} suggestions auto-accepted)` : ''}${unmatched ? ` · ${unmatched} with no match` : ''}.`,
+            });
+          }}
         >
-          Create value map
+          {created ? '✓ Value map saved' : 'Create value map'}
         </button>
 
         <button

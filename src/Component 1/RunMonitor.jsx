@@ -1,5 +1,5 @@
-
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFeedback } from './ui/feedbackContext';
 import './RunMonitor.css';
 
 const objectStatuses = [
@@ -13,26 +13,44 @@ const objectStatuses = [
   { name: 'Files', status: 'Queued', icon: '◷', type: 'queued' },
 ];
 
-const metrics = [
-  { label: 'ROWS TO LOAD', value: '178,700', note: 'after filters and dedupe', icon: '▤', type: 'blue' },
-  { label: 'IN QUEUE', value: '46,180', note: 'waiting to be sent', icon: '⌛', type: 'gray' },
-  { label: 'PROCESSING', value: '20,000', note: '2 jobs in flight', icon: '⚙', type: 'blue' },
-  { label: 'SUCCEEDED', value: '112,507', note: 'incl. 5,333 updated', icon: '✓', type: 'green' },
-  { label: 'FAILED', value: '13', note: '2 row locks retried OK', icon: '!', type: 'red' },
-  { label: 'THROUGHPUT', value: '1,712 /s', note: 'elapsed 1:06 • ETA 0:39', icon: '▥', type: 'blue' },
+// Simulated run: one tick per second while the run is Running.
+const TOTAL_ROWS = 178700;
+const BATCH_SIZE = 10000;
+const BATCH_COUNT = Math.ceil(TOTAL_ROWS / BATCH_SIZE);
+const IN_FLIGHT = 20000;
+const START_SUCCEEDED = 112507;
+const START_ELAPSED = 66;
+
+const errorPool = [
+  { field: 'BillingCountryCode', code: 'FIELD_CUSTOM_VALIDATION_EXCEPTION', reason: 'Billing country is required for Customer accounts.' },
+  { field: 'Legacy_Id__c', code: 'DUPLICATE_VALUE', reason: 'duplicate value found: Legacy_Id__c duplicates value' },
+  { field: 'Status__c', code: 'INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST', reason: 'bad value for restricted picklist field: Z' },
+  { field: 'Site', code: 'STRING_TOO_LONG', reason: 'Account Site: data value too large (max length=80)' },
+  { field: '—', code: 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY', reason: 'AccountTrigger: System.LimitException: Too many queries' },
 ];
 
-const initialBatches = [
-  { batch: 10, rows: '10,000', status: 'Complete', progress: 100, failed: 1 },
-  { batch: 11, rows: '10,000', status: 'Complete', progress: 100, failed: 1 },
-  { batch: 12, rows: '10,000', status: 'In progress', progress: 43, failed: 1 },
-  { batch: 13, rows: '10,000', status: 'In progress', progress: 15, failed: 0 },
-  { batch: 14, rows: '10,000', status: 'In progress', progress: 0, failed: 0 },
-  { batch: 15, rows: '10,000', status: 'Queued', progress: 0, failed: 0 },
-  { batch: 16, rows: '10,000', status: 'Queued', progress: 0, failed: 0 },
-];
+const initialFailureCounts = {
+  FIELD_CUSTOM_VALIDATION_EXCEPTION: 5,
+  DUPLICATE_VALUE: 3,
+  INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST: 2,
+  STRING_TOO_LONG: 2,
+  CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY: 1,
+};
 
-const errors = [
+// Deterministic per-batch failure counts so the table doesn't jump around.
+const batchFailures = Array.from({ length: BATCH_COUNT }, (_, index) => (index * 7) % 5 === 0 ? 0 : (index % 3));
+
+const formatNumber = (value) => Math.round(value).toLocaleString('en-US');
+
+const formatDuration = (seconds) => {
+  const safe = Math.max(0, Math.round(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+};
+
+const clockTime = () =>
+  new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+const initialErrors = [
   { time: '10:03:05', record: 'C1112090', field: 'Site', code: 'STRING_TOO_LONG', reason: 'Account Site: data value too large (max length=80)' },
   { time: '10:03:00', record: 'C1103512', field: 'BillingCountryCode', code: 'FIELD_CUSTOM_VALIDATION_EXCEPTION', reason: 'Billing country is required for Customer accounts.' },
   { time: '10:02:57', record: 'C1097754', field: 'Legacy_Id__c', code: 'DUPLICATE_VALUE', reason: 'duplicate value found: Legacy_Id__c duplicates value' },
@@ -43,13 +61,6 @@ const errors = [
   { time: '10:02:31', record: 'C1052911', field: 'BillingCountryCode', code: 'FIELD_CUSTOM_VALIDATION_EXCEPTION', reason: 'Billing country is required for Customer accounts.' },
 ];
 
-const failures = [
-  { reason: 'FIELD_CUSTOM_VALIDATION_EXCEPTION', count: 5, width: 62 },
-  { reason: 'DUPLICATE_VALUE', count: 3, width: 34 },
-  { reason: 'INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST', count: 2, width: 23 },
-  { reason: 'STRING_TOO_LONG', count: 2, width: 20 },
-  { reason: 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY', count: 1, width: 10 },
-];
 
 const previewRows = [
   { field: 'Name', before: 'ACME Industrial Limited', after: 'ACME Industrial Limited', result: 'Kept', type: 'kept' },
@@ -100,26 +111,229 @@ function downloadCSV(rows) {
   URL.revokeObjectURL(url);
 }
 
+
+const initialSim = () => ({
+  succeeded: START_SUCCEEDED,
+  failed: 13,
+  elapsed: START_ELAPSED,
+  throughput: 1712,
+  errors: initialErrors,
+  failureCounts: initialFailureCounts,
+});
+
+function nextSim(previous) {
+  const done = previous.succeeded + previous.failed;
+  const remaining = TOTAL_ROWS - done;
+  if (remaining <= 0) return previous;
+
+  const throughput = Math.round(1550 + Math.random() * 400);
+  let failed = previous.failed;
+  let { errors, failureCounts } = previous;
+
+  if (Math.random() < 0.3 && remaining > throughput) {
+    const sample = errorPool[Math.floor(Math.random() * errorPool.length)];
+    const error = {
+      ...sample,
+      time: clockTime(),
+      record: `C1${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`,
+      fresh: true,
+    };
+    failed += 1;
+    errors = [error, ...errors.map((item) => ({ ...item, fresh: false }))].slice(0, 60);
+    failureCounts = { ...failureCounts, [sample.code]: (failureCounts[sample.code] || 0) + 1 };
+  }
+
+  const succeeded = Math.min(TOTAL_ROWS - failed, previous.succeeded + throughput);
+
+  return {
+    ...previous,
+    succeeded,
+    failed,
+    errors,
+    failureCounts,
+    throughput,
+    elapsed: previous.elapsed + 1,
+  };
+}
+
 export default function RunMonitor() {
-  const [runState, setRunState] = useState('Running');
-  const [selectedError, setSelectedError] = useState(errors[0]);
+  const { notify, confirm } = useFeedback();
+  // What the user chose. 'Complete' is derived from the data, not stored.
+  const [controlState, setControlState] = useState('Running');
+  const [sim, setSim] = useState(initialSim);
+  const [selectedRecord, setSelectedRecord] = useState(initialErrors[0].record);
   const [showReport, setShowReport] = useState(false);
-  const [showRetryMessage, setShowRetryMessage] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const completionNotified = useRef(false);
+
+  const done = sim.succeeded + sim.failed;
+  const isFinished = done >= TOTAL_ROWS;
+  const runState = isFinished && controlState === 'Running' ? 'Complete' : controlState;
+
+  useEffect(() => {
+    if (runState !== 'Running') return undefined;
+    const timer = window.setInterval(() => setSim(nextSim), 1000);
+    return () => window.clearInterval(timer);
+  }, [runState]);
+
+  useEffect(() => {
+    if (runState !== 'Complete' || completionNotified.current) return;
+    completionNotified.current = true;
+    notify('Account load complete', {
+      type: sim.failed ? 'warning' : 'success',
+      message: `${formatNumber(sim.succeeded)} rows loaded · ${sim.failed} failed. Contact starts next.`,
+      duration: 6000,
+    });
+  }, [runState, sim.failed, sim.succeeded, notify]);
+
+  const isActive = runState === 'Running';
+  const remaining = Math.max(0, TOTAL_ROWS - done);
+  const processing = isActive ? Math.min(IN_FLIGHT, remaining) : 0;
+  const queued = remaining - processing;
+  const percent = (done / TOTAL_ROWS) * 100;
+  const throughput = isActive ? sim.throughput : 0;
+  const eta = sim.throughput ? remaining / sim.throughput : 0;
+
+  const metrics = [
+    { label: 'ROWS TO LOAD', value: formatNumber(TOTAL_ROWS), note: 'after filters and dedupe', icon: '▤', type: 'blue' },
+    { label: 'IN QUEUE', value: formatNumber(queued), note: 'waiting to be sent', icon: '⌛', type: 'gray' },
+    {
+      label: 'PROCESSING',
+      value: formatNumber(processing),
+      note: processing ? `${Math.ceil(processing / BATCH_SIZE)} jobs in flight` : 'no jobs in flight',
+      icon: '⚙',
+      type: 'blue',
+    },
+    {
+      label: 'SUCCEEDED',
+      value: formatNumber(sim.succeeded),
+      note: `incl. ${formatNumber(sim.succeeded * 0.0474)} updated`,
+      icon: '✓',
+      type: 'green',
+    },
+    { label: 'FAILED', value: formatNumber(sim.failed), note: '2 row locks retried OK', icon: '!', type: 'red' },
+    {
+      label: 'THROUGHPUT',
+      value: `${formatNumber(throughput)} /s`,
+      note: `elapsed ${formatDuration(sim.elapsed)} • ${isFinished ? 'done' : `ETA ${formatDuration(eta)}`}`,
+      icon: '▥',
+      type: 'blue',
+    },
+  ];
+
+  const objects = objectStatuses.map((item) => {
+    if (item.name !== 'Account') {
+      if (item.name === 'Contact' && runState === 'Complete') {
+        return { ...item, status: 'Starting…', icon: '◔', type: 'running' };
+      }
+      return item;
+    }
+    if (runState === 'Complete') return { ...item, status: 'Done', icon: '✓', type: 'done' };
+    if (runState === 'Aborted') return { ...item, status: 'Aborted', icon: '!', type: 'blocked' };
+    return { ...item, status: `${percent.toFixed(1)}%`, icon: runState === 'Paused' ? 'Ⅱ' : '◔' };
+  });
+
+  const batches = useMemo(() => {
+    const current = Math.floor(done / BATCH_SIZE);
+    const first = Math.max(0, Math.min(current - 2, BATCH_COUNT - 7));
+    return Array.from({ length: Math.min(7, BATCH_COUNT) }, (_, offset) => {
+      const index = first + offset;
+      const start = index * BATCH_SIZE;
+      const size = Math.min(BATCH_SIZE, TOTAL_ROWS - start);
+      const progress = Math.max(0, Math.min(100, ((done - start) / size) * 100));
+      const inFlight = start < done + processing;
+      return {
+        batch: index + 1,
+        rows: formatNumber(size),
+        progress: Math.round(progress),
+        status: progress >= 100 ? 'Complete' : inFlight && isActive ? 'In progress' : progress > 0 ? 'Paused' : 'Queued',
+        failed: progress > 0 ? batchFailures[index] : 0,
+      };
+    });
+  }, [done, processing, isActive]);
+
+  const completedBatches = Math.floor(done / BATCH_SIZE);
+
+  const failures = useMemo(() => {
+    const entries = Object.entries(sim.failureCounts)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1]);
+    const max = entries[0]?.[1] || 1;
+    return entries.map(([reason, count]) => ({ reason, count, width: (count / max) * 62 }));
+  }, [sim.failureCounts]);
+
+  const selectedError = sim.errors.find((item) => item.record === selectedRecord) || sim.errors[0];
 
   const handlePause = () => {
-    setRunState((current) => current === 'Paused' ? 'Running' : 'Paused');
+    const next = runState === 'Paused' ? 'Running' : 'Paused';
+    setControlState(next);
+    notify(next === 'Paused' ? 'Run paused' : 'Run resumed', {
+      message: next === 'Paused'
+        ? 'Batches already sent to Salesforce will finish.'
+        : 'Sending the next batch.',
+    });
   };
 
-  const handleAbort = () => {
+  const handleAbort = async () => {
     if (runState === 'Aborted') return;
-    const confirmed = window.confirm('Are you sure you want to abort this migration run?');
-    if (confirmed) setRunState('Aborted');
+    const confirmed = await confirm({
+      title: 'Abort this migration run?',
+      message: `${formatNumber(sim.succeeded)} rows already loaded stay in SF_UAT. ${formatNumber(remaining)} queued rows will not be sent.`,
+      confirmLabel: 'Abort run',
+      danger: true,
+    });
+    if (confirmed) {
+      setControlState('Aborted');
+      notify('Run aborted', { type: 'error', message: 'You can restart the plan from the Migration screen.' });
+    }
+  };
+
+  const handleRestart = () => {
+    setSim({ ...initialSim(), succeeded: 0, failed: 0, elapsed: 0, errors: [], failureCounts: {} });
+    completionNotified.current = false;
+    setControlState('Running');
+    notify('Run restarted', { type: 'info', message: 'Account → SF_UAT from the first batch.' });
+  };
+
+  const handleRetry = () => {
+    if (!sim.failed) {
+      notify('No failed records to retry', { type: 'info' });
+      return;
+    }
+    const attempted = sim.failed;
+    const fixed = Math.ceil(attempted * 0.6);
+    setRetrying(true);
+    window.setTimeout(() => {
+      notify(`Retried ${attempted} records`, {
+        type: 'success',
+        message: `${fixed} loaded after auto-fix · ${attempted - fixed} still need a mapping change.`,
+        duration: 5500,
+      });
+      setSim((previous) => {
+        const removed = previous.errors.slice(-fixed);
+        const failureCounts = { ...previous.failureCounts };
+        removed.forEach((item) => {
+          failureCounts[item.code] = Math.max(0, (failureCounts[item.code] || 0) - 1);
+        });
+        return {
+          ...previous,
+          succeeded: previous.succeeded + Math.min(fixed, previous.failed),
+          failed: Math.max(0, previous.failed - fixed),
+          errors: previous.errors.slice(0, previous.errors.length - removed.length),
+          failureCounts,
+        };
+      });
+      setRetrying(false);
+    }, 1800);
   };
 
   const handleReport = () => {
     setShowReport(true);
     window.setTimeout(() => window.print(), 100);
   };
+
+  const isFinal = runState === 'Aborted' || runState === 'Complete';
 
   return (
     <div className="run-monitor-page">
@@ -148,18 +362,20 @@ export default function RunMonitor() {
         </div>
 
         <div className="rm-run-actions">
-          <button
-            className="rm-action-button"
-            onClick={handlePause}
-            disabled={runState === 'Aborted'}
-          >
-            <span>{runState === 'Paused' ? '▶' : 'Ⅱ'}</span>
-            {runState === 'Paused' ? 'Resume' : 'Pause'}
-          </button>
+          {isFinal ? (
+            <button className="rm-action-button" onClick={handleRestart}>
+              <span>↻</span> Run again
+            </button>
+          ) : (
+            <button className="rm-action-button" onClick={handlePause}>
+              <span>{runState === 'Paused' ? '▶' : 'Ⅱ'}</span>
+              {runState === 'Paused' ? 'Resume' : 'Pause'}
+            </button>
+          )}
           <button
             className="rm-action-button abort"
             onClick={handleAbort}
-            disabled={runState === 'Aborted'}
+            disabled={isFinal}
           >
             <span>◉</span> Abort
           </button>
@@ -175,9 +391,14 @@ export default function RunMonitor() {
       {runState === 'Aborted' && (
         <div className="rm-notice danger">This migration run has been aborted.</div>
       )}
+      {runState === 'Complete' && (
+        <div className="rm-notice success">
+          Account finished: {formatNumber(sim.succeeded)} loaded, {sim.failed} failed. Contact is starting.
+        </div>
+      )}
 
       <section className="rm-object-strip" aria-label="Migration object status">
-        {objectStatuses.map((item, index) => (
+        {objects.map((item, index) => (
           <div className={`rm-object-card ${item.type}`} key={item.name}>
             <div className="rm-object-name">{index + 1}. {item.name}</div>
             <div className={`rm-object-status ${item.type}`}>
@@ -194,30 +415,30 @@ export default function RunMonitor() {
       <section className="rm-progress-panel">
         <div className="rm-progress-heading">
           <strong>Overall progress</strong>
-          <div className="rm-mini-progress"><span style={{ width: '63%' }} /></div>
+          <div className="rm-mini-progress"><span style={{ width: `${percent}%` }} /></div>
         </div>
         <div className="rm-progress-content">
-          <div className="rm-progress-bar" aria-label="63 percent complete">
-            <span className="succeeded" style={{ width: '63%' }} />
-            <span className="processing" style={{ width: '11.2%' }} />
-            <span className="queued" style={{ width: '25.8%' }} />
+          <div className="rm-progress-bar" aria-label={`${percent.toFixed(0)} percent complete`}>
+            <span className="succeeded" style={{ width: `${percent}%` }} />
+            <span className={`processing ${isActive ? 'rm-pulse' : ''}`} style={{ width: `${(processing / TOTAL_ROWS) * 100}%` }} />
+            <span className="queued" style={{ width: `${(queued / TOTAL_ROWS) * 100}%` }} />
           </div>
           <div className="rm-progress-legend">
-            <span><i className="success-dot" />Succeeded (112,507)</span>
-            <span><i className="processing-dot" />Processing (20,000)</span>
-            <span><i className="queued-dot" />In queue (46,180)</span>
-            <span><i className="failed-dot" />Failed (13)</span>
+            <span><i className="success-dot" />Succeeded ({formatNumber(sim.succeeded)})</span>
+            <span><i className="processing-dot" />Processing ({formatNumber(processing)})</span>
+            <span><i className="queued-dot" />In queue ({formatNumber(queued)})</span>
+            <span><i className="failed-dot" />Failed ({formatNumber(sim.failed)})</span>
           </div>
         </div>
         <div className="rm-progress-total">
-          <strong>63.0% complete</strong>
-          <span>113,400 / 178,700 rows</span>
+          <strong>{percent.toFixed(1)}% complete</strong>
+          <span>{formatNumber(done)} / {formatNumber(TOTAL_ROWS)} rows</span>
         </div>
       </section>
 
       <section className="rm-main-grid">
         <div className="rm-panel rm-batches-panel">
-          <PanelTitle action={<span className="rm-muted">11 of 18 complete</span>}>
+          <PanelTitle action={<span className="rm-muted">{completedBatches} of {BATCH_COUNT} complete</span>}>
             Batches <span className="rm-title-muted">· Bulk API 2.0 · 10,000 rows</span>
           </PanelTitle>
           <div className="rm-table-wrap">
@@ -226,12 +447,19 @@ export default function RunMonitor() {
                 <tr><th>Batch</th><th>Rows</th><th>Status</th><th>Progress</th><th>Failed</th></tr>
               </thead>
               <tbody>
-                {initialBatches.map((batch) => (
+                {batches.map((batch) => (
                   <tr key={batch.batch}>
                     <td>#{batch.batch}</td>
                     <td>{batch.rows}</td>
                     <td><StatusPill status={batch.status} /></td>
-                    <td><div className="rm-batch-progress"><span style={{ width: `${batch.progress}%` }} /></div></td>
+                    <td>
+                      <div className="rm-batch-progress">
+                        <span
+                          className={batch.progress >= 100 ? 'complete' : ''}
+                          style={{ width: `${batch.progress}%` }}
+                        />
+                      </div>
+                    </td>
                     <td className={batch.failed ? 'rm-failed-number' : ''}>{batch.failed}</td>
                   </tr>
                 ))}
@@ -243,29 +471,40 @@ export default function RunMonitor() {
         <div className="rm-panel rm-errors-panel">
           <PanelTitle action={
             <>
-              <button className="rm-small-button" onClick={() => downloadCSV(errors)}>⇩ Download error CSV</button>
               <button
                 className="rm-small-button"
-                onClick={() => setShowRetryMessage(true)}
+                onClick={() => {
+                  downloadCSV(sim.errors);
+                  notify(`Downloaded ${sim.errors.length} error records`, { type: 'success' });
+                }}
+                disabled={!sim.errors.length}
               >
-                ⚒ Fix &amp; retry failed
+                ⇩ Download error CSV
+              </button>
+              <button
+                className="rm-small-button"
+                onClick={handleRetry}
+                disabled={retrying || !sim.failed}
+              >
+                {retrying ? 'Retrying…' : '⚒ Fix & retry failed'}
               </button>
             </>
           }>
-            <span className="rm-live-dot" /> Error records <span className="rm-title-muted">· Live</span>
+            <span className={`rm-live-dot ${isActive ? 'rm-pulse' : ''}`} /> Error records{' '}
+            <span className="rm-title-muted">· {isActive ? 'Live' : runState}</span>
           </PanelTitle>
-          <div className="rm-error-subtitle">Newest first · {errors.length} shown</div>
+          <div className="rm-error-subtitle">Newest first · {sim.errors.length} shown</div>
           <div className="rm-table-wrap rm-error-table-wrap">
             <table className="rm-table rm-errors-table">
               <thead>
                 <tr><th>Time</th><th>Record</th><th>Field</th><th>Error code</th><th>Reason</th></tr>
               </thead>
               <tbody>
-                {errors.map((error) => (
+                {sim.errors.map((error) => (
                   <tr
                     key={`${error.time}-${error.record}`}
-                    className={selectedError?.record === error.record ? 'selected' : ''}
-                    onClick={() => setSelectedError(error)}
+                    className={`${selectedError?.record === error.record ? 'selected' : ''} ${error.fresh ? 'ui-row-flash' : ''}`}
+                    onClick={() => setSelectedRecord(error.record)}
                   >
                     <td>{error.time}</td>
                     <td>{error.record}</td>
@@ -274,15 +513,12 @@ export default function RunMonitor() {
                     <td className="rm-reason-cell" title={error.reason}>{error.reason}</td>
                   </tr>
                 ))}
+                {sim.errors.length === 0 && (
+                  <tr><td colSpan={5} className="rm-muted">No errors so far.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
-          {showRetryMessage && (
-            <div className="rm-inline-message">
-              Retry preview: resolve the underlying validation or duplicate issue before retrying these records.
-              <button onClick={() => setShowRetryMessage(false)} aria-label="Dismiss">×</button>
-            </div>
-          )}
         </div>
 
         <div className="rm-panel rm-failures-panel">
@@ -295,6 +531,7 @@ export default function RunMonitor() {
                 <strong>{failure.count}</strong>
               </div>
             ))}
+            {failures.length === 0 && <span className="rm-muted">No failures.</span>}
           </div>
         </div>
 

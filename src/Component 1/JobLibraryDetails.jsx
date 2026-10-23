@@ -1,7 +1,9 @@
 
 import { useState } from 'react';
+import { useFeedback } from './ui/feedbackContext';
 
-export default function JobLibraryDetails({ job }) {
+export default function JobLibraryDetails({ job, onRunWithProfile }) {
+  const { notify } = useFeedback();
   const [format, setFormat] = useState('JSON');
   const [tab, setTab] = useState('Definition');
   const [copied, setCopied] = useState(false);
@@ -63,7 +65,7 @@ export default function JobLibraryDetails({ job }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      window.alert('Copy is unavailable. Please select and copy the definition.');
+      notify('Copy is unavailable', { type: 'warning', message: 'Select the definition text and copy it manually.' });
     }
   };
 
@@ -162,7 +164,8 @@ export default function JobLibraryDetails({ job }) {
         <button
           type="button"
           className="job-run-profile-button"
-          onClick={() => window.alert(`Run ${job.name} with a profile`)}
+          onClick={() => onRunWithProfile(job)}
+          disabled={job.result === 'Running…'}
         >
           ▷ Run with profile...
         </button>
@@ -180,6 +183,7 @@ export default function JobLibraryDetails({ job }) {
             link.download = `${job.name}.${format.toLowerCase()}`;
             link.click();
             URL.revokeObjectURL(url);
+            notify(`Saved ${job.name}.${format.toLowerCase()}`, { type: 'success' });
           }}
         >
           Save {format} file

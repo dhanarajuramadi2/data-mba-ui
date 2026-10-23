@@ -248,3 +248,61 @@
   .migration-objects-card { overflow-x: auto; }
   .migration-table { min-width: 780px; }
 }
+
+/* Interactive additions */
+.migration-pill.running { color: #1d4fc4; background: #e6eeff; }
+.migration-pill .ui-spinner { width: 9px; height: 9px; margin-right: 3px; }
+.migration-pill-button { border: 0; font: inherit; font-size: 11px; cursor: pointer; }
+.migration-pill-button:hover { filter: brightness(0.95); box-shadow: 0 0 0 2px rgba(33, 96, 232, 0.18); }
+.migration-link { cursor: pointer; }
+.migration-table tbody tr[draggable='true'] .migration-reorder button { cursor: grab; }
+.migration-reorder button:disabled { opacity: 0.35; cursor: not-allowed; }
+.migration-table tbody tr.migration-dragging { opacity: 0.45; }
+.migration-table tbody tr.migration-drop-target td { box-shadow: inset 0 2px 0 #2160e8; }
+.migration-row-menu button { cursor: pointer; }
+.migration-row-menu button.danger { color: #c32121; }
+.migration-row-menu button.danger:hover { background: #ffe2e1; }
+.migration-heading-actions button:disabled,
+.migration-environment-tabs button:disabled { opacity: 0.55; cursor: not-allowed; }
+.migration-primary .ui-spinner { margin-right: 6px; }
+.migration-monitor-link { margin-left: auto; border: 0; background: transparent; color: #2160e8; font-weight: 600; cursor: pointer; }
+.migration-results-table th.active { color: #1d4fc4; background: #e6eeff; }
+.migration-results-table tbody tr.selected { background: #f1f6ff; }
+.migration-results-table .migration-result-chip { transition: background-color 0.3s; }
+.migration-prod-checks.highlight { border-color: #f5c08a; box-shadow: 0 0 0 3px #fff1e0; transition: box-shadow 0.2s; }
+
+.migration-segmented { display: flex; flex-wrap: wrap; gap: 0; }
+.migration-segmented button {
+  padding: 8px 14px; border: 1px solid #d5dbe5; margin-left: -1px; background: #fff; color: #374151;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.migration-segmented button:first-child { margin-left: 0; border-radius: 8px 0 0 8px; }
+.migration-segmented button:last-child { border-radius: 0 8px 8px 0; }
+.migration-segmented button.active { position: relative; border-color: #2160e8; background: #e8efff; color: #1d4fc4; }
+
+.migration-chip-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.migration-chip-picker button {
+  padding: 5px 10px; border: 1px solid #d5dbe5; border-radius: 16px; background: #fff; color: #374151;
+  font: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.migration-chip-picker button.active { border-color: #2160e8; background: #e8efff; color: #1d4fc4; }
+
+.migration-mapping-alert { margin: 0 0 12px; padding: 9px 12px; border-radius: 8px; background: #fff0f0; color: #b42318; font-size: 12px; font-weight: 600; }
+.migration-mapping-alert.ok { background: #e7f7ee; color: #0b7a4b; }
+.migration-mapping-wrap { overflow-x: auto; }
+.migration-mapping-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.migration-mapping-table th { padding: 8px; background: #f7f9fc; color: #586f90; font-size: 10px; text-align: left; text-transform: uppercase; }
+.migration-mapping-table td { padding: 8px; border-top: 1px solid #e8edf4; vertical-align: middle; }
+.migration-mapping-table td strong { font-size: 12px; }
+.migration-mapping-table td small { display: block; margin-top: 2px; color: #6b7a90; font-size: 11px; }
+.migration-mapping-table select { width: 100%; min-width: 150px; min-height: 32px; padding: 0 8px; border: 1px solid #d5dbe5; border-radius: 6px; background: #fff; font: inherit; font-size: 12px; }
+.migration-mapping-table tr.invalid td:first-child { box-shadow: inset 3px 0 0 #d93636; }
+.migration-mapping-table tr.invalid select { border-color: #f0a3a3; background: #fff7f7; }
+.migration-required { margin-left: 6px; padding: 2px 6px; border-radius: 10px; background: #fde8e8; color: #b42318; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.migration-mapping-arrow { color: #9aa6b8; text-align: center; }
+.migration-preview-cell { color: #4b5a72; font-family: ui-monospace, Consolas, monospace; font-size: 11px; white-space: nowrap; }
+.migration-automap { margin-right: auto; }
+.migration-mapping-table th,
+.migration-mapping-table td { text-align: left; color: #1d2433; }
+.migration-mapping-table select { color: #111827; }
+.migration-mapping-table td.migration-mapping-arrow { text-align: center; color: #9aa6b8; }

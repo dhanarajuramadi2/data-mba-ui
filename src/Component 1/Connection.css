@@ -509,6 +509,43 @@ input {
   background: #dc2626;
 }
 
+.status-testing {
+  gap: 6px;
+  color: #1d4fc4;
+  background: #e8efff;
+}
+
+.status-neutral {
+  color: #4b5563;
+  background: #eef0f4;
+}
+
+.status-neutral .status-dot {
+  background: #9ca3af;
+}
+
+.row-action-menu button.row-action-danger {
+  color: #b42318;
+}
+
+.row-action-menu button.row-action-danger:hover {
+  background: #fee4e2;
+}
+
+.row-action-menu button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.panel-more-wrap {
+  position: relative;
+}
+
+.panel-more-menu {
+  top: 32px;
+  right: 0;
+}
+
 .reauth-link {
   padding: 0;
   border: none;

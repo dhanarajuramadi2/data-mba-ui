@@ -1,5 +1,6 @@
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 import './Files.css';
 
 const initialJobs = [
@@ -23,7 +24,21 @@ function downloadFile(filename, content) {
   URL.revokeObjectURL(url);
 }
 
+function FileJobMenu({ onClose, onDownload, onDuplicate, onRemove }) {
+  useCloseOnOutsideClick(true, onClose);
+  return (
+    <div className="files-job-menu ui-popup-menu" onClick={(event) => event.stopPropagation()}>
+      <button type="button" onClick={onDownload}>⇩ Download details</button>
+      <button type="button" onClick={onDuplicate}>⧉ Duplicate job</button>
+      <button type="button" className="danger" onClick={onRemove}>✕ Remove job</button>
+    </div>
+  );
+}
+
 export default function Files() {
+  const { notify, confirm } = useFeedback();
+  const [menuJobId, setMenuJobId] = useState(null);
+  const closeMenu = useCallback(() => setMenuJobId(null), []);
   const [tab, setTab] = useState('extract');
   const [sourceOrg, setSourceOrg] = useState('SF_PROD');
   const [linkedObject, setLinkedObject] = useState('Case');
@@ -49,7 +64,7 @@ export default function Files() {
   const [showCriteriaHelp, setShowCriteriaHelp] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [showEstimate, setShowEstimate] = useState(false);
-  const [jobName, setJobName] = useState('EXT_CASE_FILES_2026');
+  const jobName = 'EXT_CASE_FILES_2026';
   const [running, setRunning] = useState(false);
 
   const selectedTypes = Object.values(fileTypes).filter(Boolean).length;
@@ -155,27 +170,33 @@ export default function Files() {
     setNotice('File jobs manifest downloaded.');
   }
 
-  function handleJobMenu(job) {
-    const action = window.prompt(
-      `Action for ${job.name}:\nEnter 1 to download details\nEnter 2 to duplicate job\nEnter 3 to remove job`
-    );
+  async function handleJobAction(job, action) {
+    closeMenu();
 
-    if (action === '1') {
+    if (action === 'download') {
       downloadFile(
         `${job.name}.csv`,
         `Job,Direction,Files,Size,Status,Started\n${[
           job.name, job.direction, job.files, job.size, job.status, job.date
         ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')}`
       );
-    } else if (action === '2') {
+      notify(`Downloaded ${job.name}.csv`, { type: 'success' });
+    } else if (action === 'duplicate') {
       setJobs(current => [
         { ...job, id: Date.now(), name: `${job.name}_COPY`, status: 'Saved · ready to run' },
         ...current,
       ].slice(0, 4));
-      setNotice(`Duplicated ${job.name}.`);
-    } else if (action === '3') {
+      notify(`Duplicated ${job.name}`, { type: 'success', message: 'The copy is saved and ready to run.' });
+    } else if (action === 'remove') {
+      const ok = await confirm({
+        title: `Remove ${job.name}?`,
+        message: 'Files already extracted are not deleted.',
+        confirmLabel: 'Remove job',
+        danger: true,
+      });
+      if (!ok) return;
       setJobs(current => current.filter(item => item.id !== job.id));
-      setNotice(`Removed ${job.name} from the demo job list.`);
+      notify(`Removed ${job.name}`);
     }
   }
 
@@ -455,9 +476,26 @@ export default function Files() {
                         </span>
                       </td>
                       <td>{job.date}</td>
-                      <td>
+                      <td className="files-job-actions">
                         <button className="files-link-button" onClick={() => viewJob(job)}>View</button>
-                        <button className="files-more-button" onClick={() => handleJobMenu(job)}>···</button>
+                        <button
+                          className="files-more-button"
+                          aria-label={`More actions for ${job.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setMenuJobId(menuJobId === job.id ? null : job.id);
+                          }}
+                        >
+                          ···
+                        </button>
+                        {menuJobId === job.id && (
+                          <FileJobMenu
+                            onClose={closeMenu}
+                            onDownload={() => handleJobAction(job, 'download')}
+                            onDuplicate={() => handleJobAction(job, 'duplicate')}
+                            onRemove={() => handleJobAction(job, 'remove')}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))}

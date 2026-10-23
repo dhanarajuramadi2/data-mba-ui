@@ -1,0 +1,416 @@
+/* Shared feedback UI: toasts, modals, dialogs, spinner */
+
+.ui-toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.ui-toast {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 12px 14px;
+  border: 1px solid #e3e8f2;
+  border-left: 4px solid #2160e8;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.16);
+  color: #1d2433;
+  font-size: 13px;
+  pointer-events: auto;
+  animation: ui-toast-in 0.25s ease-out;
+}
+
+.ui-toast.success { border-left-color: #1f9d55; }
+.ui-toast.error { border-left-color: #d93636; }
+.ui-toast.warning { border-left-color: #e08a00; }
+
+.ui-toast-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e8efff;
+  color: #2160e8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ui-toast.success .ui-toast-icon { background: #e5f6ec; color: #1f9d55; }
+.ui-toast.error .ui-toast-icon { background: #fdeaea; color: #d93636; }
+.ui-toast.warning .ui-toast-icon { background: #fff3df; color: #e08a00; }
+
+.ui-toast-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.ui-toast-copy strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ui-toast-copy p {
+  margin: 2px 0 0;
+  color: #5b6475;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ui-toast-close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: #8a93a5;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-toast-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: currentColor;
+  opacity: 0.12;
+  transform-origin: left;
+  animation: ui-toast-timer linear forwards;
+}
+
+@keyframes ui-toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes ui-toast-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* Modal */
+
+.ui-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.45);
+  animation: ui-fade-in 0.15s ease-out;
+}
+
+.ui-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100vh - 32px);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  color: #1d2433;
+  animation: ui-modal-in 0.2s ease-out;
+}
+
+.ui-modal.small { max-width: 420px; }
+.ui-modal.medium { max-width: 600px; }
+.ui-modal.large { max-width: 860px; }
+
+.ui-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.ui-modal-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  color: #111827;
+}
+
+.ui-modal-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ui-modal-close {
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-modal-body {
+  overflow-y: auto;
+  padding: 16px 20px;
+  font-size: 13px;
+}
+
+.ui-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid #edf0f5;
+}
+
+.ui-dialog-message {
+  margin: 0 0 12px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ui-field input,
+.ui-field select,
+.ui-field textarea {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d5dbe5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.ui-field textarea {
+  min-height: 70px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.ui-field input:focus,
+.ui-field select:focus,
+.ui-field textarea:focus {
+  outline: none;
+  border-color: #2160e8;
+  box-shadow: 0 0 0 3px rgba(33, 96, 232, 0.15);
+}
+
+.ui-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0 14px;
+}
+
+.ui-field-error {
+  margin: 0 0 8px;
+  color: #d93636;
+  font-size: 12px;
+}
+
+.ui-button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid #d5dbe5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1d2433;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.ui-button:hover:not(:disabled) { background: #f4f6fa; }
+.ui-button:active:not(:disabled) { transform: scale(0.97); }
+.ui-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ui-button.primary {
+  border-color: #2160e8;
+  background: #2160e8;
+  color: #ffffff;
+}
+
+.ui-button.primary:hover:not(:disabled) { background: #174dc4; }
+
+.ui-button.danger {
+  border-color: #d93636;
+  background: #d93636;
+  color: #ffffff;
+}
+
+.ui-button.danger:hover:not(:disabled) { background: #b92b2b; }
+
+/* Spinner */
+
+.ui-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: ui-spin 0.7s linear infinite;
+}
+
+@keyframes ui-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* App-wide micro-interactions: every button gets press feedback,
+   table rows highlight on hover, screens fade in when opened. */
+
+.main-content button:not(:disabled) {
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.main-content button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.main-content tbody tr {
+  transition: background-color 0.12s;
+}
+
+.main-content tbody tr:hover {
+  background-color: #f5f8ff;
+}
+
+.screen-enter {
+  height: 100%;
+  min-height: 0;
+  animation: ui-screen-in 0.25s ease-out;
+}
+
+@keyframes ui-screen-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.ui-row-flash {
+  animation: ui-row-flash 1.6s ease-out;
+}
+
+@keyframes ui-row-flash {
+  from { background-color: #dbe7ff; }
+  to { background-color: transparent; }
+}
+
+.ui-popup-menu {
+  animation: ui-fade-in 0.12s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-toast,
+  .ui-modal,
+  .ui-modal-backdrop,
+  .screen-enter,
+  .ui-row-flash {
+    animation: none;
+  }
+}
+
+/* Shared row/option popup menus (Files, Projects, column profile) */
+.files-job-actions,
+.project-card-top,
+.column-row-menu-cell {
+  position: relative;
+}
+
+.files-job-menu,
+.project-options-menu,
+.column-action-menu {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  top: calc(100% + 2px);
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 5px;
+  border: 1px solid #e0e6ef;
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(21, 36, 64, 0.16);
+  text-align: left;
+}
+
+.project-options-menu {
+  top: 30px;
+}
+
+.files-job-menu button,
+.project-options-menu button,
+.column-action-menu button {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #203452;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.files-job-menu button:hover,
+.project-options-menu button:hover,
+.column-action-menu button:hover {
+  background: #f0f5ff;
+}
+
+.files-job-menu button.danger,
+.project-options-menu button.danger {
+  color: #b42318;
+}
+
+.files-job-menu button.danger:hover,
+.project-options-menu button.danger:hover {
+  background: #fee4e2;
+}
+
+/* #root centers text globally; keep popups left-aligned */
+.ui-toast,
+.ui-modal,
+.files-job-menu,
+.project-options-menu,
+.column-action-menu {
+  text-align: left;
+}

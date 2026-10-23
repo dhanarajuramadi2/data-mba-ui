@@ -1,8 +1,10 @@
 
 import { useEffect, useState } from 'react';
+import { useFeedback } from './ui/feedbackContext';
 import './DataProfiling.css';
 
 export default function DataProfiling() {
+  const { notify } = useFeedback();
   const [showNewForm, setShowNewForm] = useState(false);
   const [sourceType, setSourceType] = useState('Salesforce');
   const [showDetails, setShowDetails] = useState(false);
@@ -106,17 +108,17 @@ export default function DataProfiling() {
 
   const handleSave = () => {
     if (!name.trim()) {
-      alert('Please enter a name.');
+      notify('Name is required', { type: 'warning', message: 'Give the profile a name.' });
       return;
     }
 
     if (sourceType === 'Salesforce' && (!sourceConnection || !objectName)) {
-      alert('Please select a source connection and table/object.');
+      notify('Source is incomplete', { type: 'warning', message: 'Select a source connection and table/object.' });
       return;
     }
 
     if (sourceType === 'CSV' && !csvFile) {
-      alert('Please upload a CSV file.');
+      notify('CSV file missing', { type: 'warning', message: 'Upload a CSV file to profile.' });
       return;
     }
 

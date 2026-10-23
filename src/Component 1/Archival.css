@@ -287,8 +287,13 @@
   background: #f3f7ff;
 }
 
-.archival-table tbody tr:first-child {
-  background: #f1f6ff;
+.archival-table tbody tr {
+  cursor: pointer;
+}
+
+.archival-table tbody tr.archive-row-selected {
+  background: #eaf1ff;
+  box-shadow: inset 3px 0 0 #2160e8;
 }
 
 .archival-table td:nth-child(2) strong {
@@ -595,4 +600,157 @@
   .archival-user strong {
     display: none;
   }
+}
+
+/* Interactive additions */
+
+.archive-menu-cell {
+  position: relative;
+}
+
+.archive-action-menu {
+  position: absolute;
+  top: 34px;
+  right: 6px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 190px;
+  padding: 5px;
+  border: 1px solid #e0e6ef;
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(21, 36, 64, 0.16);
+}
+
+.archive-action-menu button {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #203452;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.archive-action-menu button:hover:not(:disabled) {
+  background: #f0f5ff;
+}
+
+.archive-action-menu button.danger {
+  color: #bd3030;
+}
+
+.archive-action-menu button.danger:hover:not(:disabled) {
+  background: #fee8e8;
+}
+
+.archive-action-menu button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.archive-bulk-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border: 1px solid #cfdcfb;
+  border-radius: 8px;
+  background: #eef3ff;
+  color: #1d3a8a;
+  font-size: 12px;
+  animation: ui-fade-in 0.15s ease-out;
+}
+
+.archive-bulk-bar strong {
+  margin-right: 6px;
+}
+
+.archive-bulk-bar button {
+  padding: 5px 10px;
+  border: 1px solid #b9cbf5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1d4fc4;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.archive-bulk-bar button.link {
+  margin-left: auto;
+  border-color: transparent;
+  background: transparent;
+}
+
+.archive-running {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+  color: #1765ed;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.archive-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #e2e9f6;
+}
+
+.archive-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2160e8, #5b8cff);
+  transition: width 0.4s ease;
+}
+
+.archive-status.running {
+  background: #e7f0ff;
+  color: #1765ed;
+}
+
+.archive-empty {
+  padding: 28px 12px !important;
+  text-align: center;
+  color: #6b7890;
+}
+
+.archive-empty button {
+  border: 0;
+  background: transparent;
+  color: #2160e8;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.archive-detail-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.archive-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.archive-radio-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.archival-detail-card {
+  animation: ui-fade-in 0.2s ease-out;
 }

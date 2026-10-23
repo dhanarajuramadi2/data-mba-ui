@@ -144,7 +144,7 @@ function MetricCard({ icon, label, value, description, color = 'blue' }) {
 }
 
 export default function Reconciliation() {
-  const [records, setRecords] = useState(initialRecords);
+  const [records] = useState(initialRecords);
   const [search, setSearch] = useState('');
   const [selectedObject, setSelectedObject] = useState('Account');
   const [checks, setChecks] = useState(initialChecks);

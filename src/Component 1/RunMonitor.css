@@ -687,7 +687,11 @@
   background: #075be5;
 }
 
-.rm-batches-table tr:nth-child(-n + 2) .rm-batch-progress span {
+.rm-batch-progress span {
+  transition: width 0.8s linear;
+}
+
+.rm-batch-progress span.complete {
   background: #12b975;
 }
 
@@ -1220,4 +1224,36 @@
     min-height: 0;
     overflow: hidden;
   }
+}
+
+/* Live run animations */
+
+.rm-progress-bar span,
+.rm-mini-progress span,
+.rm-failure-track span {
+  transition: width 0.9s linear;
+}
+
+.rm-notice.success {
+  border-color: #bfe8d3;
+  background: #e9f8f0;
+  color: #0b7a4b;
+}
+
+.rm-pulse {
+  animation: rm-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes rm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.rm-small-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-pulse { animation: none; }
 }
