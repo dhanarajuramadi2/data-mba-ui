@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Spinner } from './ui/Feedback';
+import { ComboBox } from './ui/ComboBox';
 import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 import './Archival.css';
 
@@ -150,17 +151,15 @@ function JobFormModal({ job, onClose, onSave }) {
         <div className="ui-field-grid">
           <label className="ui-field">
             <span>Salesforce object *</span>
-            <input
-              list="archive-object-options"
+            <ComboBox
               value={form.object}
-              onChange={update('object')}
               placeholder="e.g. Task"
+              options={['Task', 'Event', 'EmailMessage', 'Case', 'Opportunity', 'Lead', 'ContentVersion']}
+              onChange={(object) => {
+                setForm((previous) => ({ ...previous, object }));
+                setError('');
+              }}
             />
-            <datalist id="archive-object-options">
-              {['Task', 'Event', 'EmailMessage', 'Case', 'Opportunity', 'Lead', 'ContentVersion'].map(
-                (item) => <option key={item} value={item} />
-              )}
-            </datalist>
           </label>
 
           <label className="ui-field">
@@ -570,9 +569,6 @@ export default function Archival({ onNavigate }) {
         </div>
         <div className="archival-user">
           <span className="archival-bell">♧</span>
-          <span className="archival-avatar">S</span>
-          <strong>Shiva Kesava</strong>
-          <span>⌄</span>
         </div>
       </header>
 

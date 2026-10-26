@@ -210,9 +210,6 @@ export default function Files() {
 
         <div className="files-user">
           <span className="files-bell">♧</span>
-          <span className="files-avatar">S</span>
-          <strong>Shiva Kesava</strong>
-          <span>⌄</span>
         </div>
       </header>
 

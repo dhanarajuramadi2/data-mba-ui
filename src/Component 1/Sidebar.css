@@ -342,3 +342,50 @@
 .projects-chevron.open {
   transform: rotate(180deg);
 }
+
+
+/* ===== Sidebar polish ===== */
+
+.sidebar-item:hover {
+  transform: translateX(2px);
+}
+
+.sidebar-item:focus-visible {
+  outline: 2px solid #77a7ff;
+  outline-offset: 2px;
+}
+
+.sidebar-navigation > .sidebar-item .sidebar-item-icon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 17px;
+  background: rgba(255, 255, 255, 0.07);
+  transition: background 0.2s ease;
+}
+
+.sidebar-navigation > .sidebar-item.active .sidebar-item-icon {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sidebar-navigation > .sidebar-item.active {
+  box-shadow: 0 6px 16px rgba(35, 85, 185, 0.35);
+}
+
+@media (max-width: 700px) {
+  .sidebar-navigation > .sidebar-item .sidebar-item-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-item:hover {
+    transform: none;
+  }
+}

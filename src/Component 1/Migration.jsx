@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Modal, Spinner } from './ui/Feedback';
+import { ComboBox } from './ui/ComboBox';
 import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 import './Migration.css';
 
@@ -115,17 +116,12 @@ function ObjectModal({ existingNames, onClose, onSave }) {
       <div className="ui-field-grid">
         <label className="ui-field">
           <span>Salesforce object *</span>
-          <input
-            list="migration-object-options"
+          <ComboBox
             value={form.name}
             placeholder="e.g. Asset"
-            onChange={(event) => { setForm({ ...form, name: event.target.value }); setError(''); }}
+            options={['Asset', 'Contract', 'Event', 'Lead', 'Order', 'Product2', 'Quote']}
+            onChange={(name) => { setForm((previous) => ({ ...previous, name })); setError(''); }}
           />
-          <datalist id="migration-object-options">
-            {['Asset', 'Contract', 'Event', 'Lead', 'Order', 'Product2', 'Quote'].map((item) => (
-              <option key={item} value={item} />
-            ))}
-          </datalist>
         </label>
         <label className="ui-field">
           <span>Source table</span>

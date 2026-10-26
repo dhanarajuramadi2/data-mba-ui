@@ -265,3 +265,89 @@
     min-width: 680px;
   }
 }
+
+
+/* ===== Depth and interaction polish ===== */
+
+.home-dashboard {
+  /* Fill the whole screen so no white band shows below short content */
+  min-height: 100%;
+  background: #f1f4f9;
+}
+
+.home-hero {
+  box-shadow: 0 4px 14px rgba(15, 80, 140, 0.22);
+}
+
+.home-metric-card {
+  border-color: #dde4ee;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 2px 8px rgba(15, 23, 42, 0.06);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.home-metric-card:hover {
+  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.06), 0 12px 24px rgba(15, 23, 42, 0.1);
+}
+
+/* Accent edge follows each card's icon colour */
+.home-metric-card:has(.home-metric-icon.green) {
+  border-left-color: #22a35a;
+}
+
+.home-metric-card:has(.home-metric-icon.yellow) {
+  border-left-color: #e0a100;
+}
+
+.home-metric-card:has(.home-metric-icon.orange) {
+  border-left-color: #f05b2b;
+}
+
+.home-projects-card {
+  border-color: #dde4ee;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 22px rgba(15, 23, 42, 0.07);
+}
+
+.home-view-all,
+.home-project-view {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.home-view-all:hover,
+.home-project-view:hover {
+  border-color: #b8d0f2;
+  box-shadow: 0 4px 10px rgba(23, 105, 207, 0.12);
+  transform: translateY(-1px);
+}
+
+.home-view-all:active,
+.home-project-view:active {
+  transform: translateY(0);
+}
+
+.home-view-all:focus-visible,
+.home-project-view:focus-visible {
+  outline: 2px solid #2160e8;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-metric-card,
+  .home-view-all,
+  .home-project-view {
+    transition: none;
+  }
+
+  .home-metric-card:hover,
+  .home-view-all:hover,
+  .home-project-view:hover {
+    transform: none;
+  }
+}
