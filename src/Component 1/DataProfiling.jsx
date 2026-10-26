@@ -1,7 +1,174 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Spinner } from './ui/Feedback';
 import { useFeedback } from './ui/feedbackContext';
+import { profileCsvFile } from '../services/profilingApi';
 import './DataProfiling.css';
+
+// Selected CSV files by profile id. Saved profiles live in localStorage, which
+// cannot hold files, so the file is kept here for this browser session (it
+// survives switching screens, not a page reload).
+const csvFilesById = new Map();
+
+const formatNumber = (value) =>
+  value === null || value === undefined
+    ? '—'
+    : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+const formatFileSize = (bytes) => {
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Results returned by the profiling API (POST /api/v1/files/profile)
+function CsvProfileResults({ report }) {
+  const {
+    summary,
+    columns = [],
+    numeric_statistics: numericStatistics = [],
+    preview_rows: previewRows = [],
+  } = report;
+  const cellCount = summary.row_count * summary.column_count;
+  const completeness = cellCount
+    ? `${(100 - (summary.total_missing_values / cellCount) * 100).toFixed(1)}%`
+    : '—';
+  const previewHeaders = columns.length
+    ? columns.map((column) => column.name)
+    : Object.keys(previewRows[0] || {});
+
+  const finding = (column) => {
+    if (column.missing_count > 0) return `Review · ${column.missing_percentage}% missing`;
+    if (summary.row_count > 1 && column.unique_count === summary.row_count) return 'OK · unique (possible key)';
+    return 'OK';
+  };
+
+  return (
+    <>
+      <div className="data-profile-summary">
+        <div>
+          <span>ROWS</span>
+          <strong>{formatNumber(summary.row_count)}</strong>
+        </div>
+
+        <div>
+          <span>COLUMNS</span>
+          <strong>{formatNumber(summary.column_count)}</strong>
+        </div>
+
+        <div>
+          <span>AVG. COMPLETENESS</span>
+          <strong>{completeness}</strong>
+        </div>
+
+        <div>
+          <span>DUPLICATE ROWS</span>
+          <strong>{formatNumber(summary.duplicate_row_count)}</strong>
+        </div>
+
+        <div>
+          <span>MISSING VALUES</span>
+          <strong>{formatNumber(summary.total_missing_values)}</strong>
+        </div>
+      </div>
+
+      <div className="data-profile-table-card">
+        <h3>Column profile ({columns.length} columns)</h3>
+
+        <div className="data-profile-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Column</th>
+                <th>Data type</th>
+                <th>Missing</th>
+                <th>Missing %</th>
+                <th>Unique values</th>
+                <th>Duplicate values</th>
+                <th>Finding</th>
+              </tr>
+            </thead>
+            <tbody>
+              {columns.map((column) => (
+                <tr key={column.name}>
+                  <td>{column.name}</td>
+                  <td>{column.data_type}</td>
+                  <td>{formatNumber(column.missing_count)}</td>
+                  <td>{column.missing_percentage}%</td>
+                  <td>{formatNumber(column.unique_count)}</td>
+                  <td>{formatNumber(column.duplicate_values)}</td>
+                  <td>{finding(column)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {numericStatistics.length > 0 && (
+        <div className="data-profile-table-card">
+          <h3>Numeric statistics ({numericStatistics.length} columns)</h3>
+
+          <div className="data-profile-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>Minimum</th>
+                  <th>Maximum</th>
+                  <th>Mean</th>
+                  <th>Median</th>
+                </tr>
+              </thead>
+              <tbody>
+                {numericStatistics.map((column) => (
+                  <tr key={column.name}>
+                    <td>{column.name}</td>
+                    <td>{formatNumber(column.minimum)}</td>
+                    <td>{formatNumber(column.maximum)}</td>
+                    <td>{formatNumber(column.mean)}</td>
+                    <td>{formatNumber(column.median)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="data-profile-table-card">
+        <h3>Preview (first {previewRows.length} rows)</h3>
+
+        <div className="data-profile-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                {previewHeaders.map((header) => (
+                  <th key={header}>{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {previewRows.map((row, index) => (
+                <tr key={index}>
+                  {previewHeaders.map((header) => (
+                    <td key={header}>
+                      {row[header] === null || row[header] === undefined ? (
+                        <span className="data-profile-null">empty</span>
+                      ) : (
+                        String(row[header])
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
 
 export default function DataProfiling() {
   const { notify } = useFeedback();
@@ -38,6 +205,15 @@ export default function DataProfiling() {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showProfileResults, setShowProfileResults] = useState(false);
   const currentProfileResults = selectedProfile?.profileResults;
+
+  // CSV profiling through the API
+  const [runFile, setRunFile] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState('');
+  const runController = useRef(null);
+
+  // Cancel an in-flight upload if the user leaves the screen
+  useEffect(() => () => runController.current?.abort(), []);
 
   
   const profileColumns = {
@@ -136,6 +312,8 @@ export default function DataProfiling() {
       profileResults: null,
     };
 
+    if (sourceType === 'CSV') csvFilesById.set(newProfile.id, csvFile);
+
     setSavedProfiles((previousProfiles) => [
       ...previousProfiles,
       newProfile,
@@ -148,24 +326,9 @@ export default function DataProfiling() {
 
   
   
-  const handleRunProfile = () => {
-    if (!selectedProfile) return;
-
-    // Generate the profile details for this record.
-    const columns = profileColumns[selectedProfile.objectName] || [];
-
-    const profileResults = {
-      rows: 184302,
-      columnCount: columns.length,
-      completeness: '81.4%',
-      duplicateCandidates: 2318,
-      columnsWithIssues: 7,
-      columns,
-      profiledAt: new Date().toISOString(),
-    };
-
+  const showResults = (profileToUpdate, profileResults) => {
     const updatedProfile = {
-      ...selectedProfile,
+      ...profileToUpdate,
       profiled: true,
       status: 'Profiled',
       profileResults,
@@ -174,13 +337,84 @@ export default function DataProfiling() {
     // Save the results against this specific record.
     setSavedProfiles((previousProfiles) =>
       previousProfiles.map((profile) =>
-        profile.id === selectedProfile.id ? updatedProfile : profile
+        profile.id === profileToUpdate.id ? updatedProfile : profile
       )
     );
 
     setSelectedProfile(updatedProfile);
     setShowRunPrompt(false);
     setShowProfileResults(true);
+  };
+
+  const runCsvProfile = async (profile) => {
+    const file = csvFilesById.get(profile.id);
+
+    if (!file) {
+      setRunError('Choose the CSV file to profile.');
+      return;
+    }
+
+    const controller = new AbortController();
+    runController.current = controller;
+    setRunning(true);
+    setRunError('');
+
+    try {
+      const response = await profileCsvFile(file, { signal: controller.signal });
+      const report = response.profiling_report;
+
+      showResults(profile, {
+        source: 'api',
+        profileId: response.profile_id,
+        filename: response.filename,
+        report,
+        profiledAt: new Date().toISOString(),
+      });
+      notify('Profiling complete', {
+        type: 'success',
+        message: `${response.filename} · ${formatNumber(report.summary.row_count)} rows, ${report.summary.column_count} columns`,
+      });
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      setRunError(error.message);
+      notify('Profiling failed', { type: 'error', message: error.message });
+    } finally {
+      if (runController.current === controller) {
+        runController.current = null;
+        setRunning(false);
+      }
+    }
+  };
+
+  const handleRunProfile = () => {
+    if (!selectedProfile) return;
+
+    if (selectedProfile.sourceType === 'CSV') {
+      runCsvProfile(selectedProfile);
+      return;
+    }
+
+    // Generate the profile details for this record.
+    const columns = profileColumns[selectedProfile.objectName] || [];
+
+    showResults(selectedProfile, {
+      rows: 184302,
+      columnCount: columns.length,
+      completeness: '81.4%',
+      duplicateCandidates: 2318,
+      columnsWithIssues: 7,
+      columns,
+      profiledAt: new Date().toISOString(),
+    });
+  };
+
+  const cancelRunPrompt = () => {
+    runController.current?.abort();
+    runController.current = null;
+    setRunning(false);
+    setRunError('');
+    setShowRunPrompt(false);
+    setShowSavedList(true);
   };
 
 
@@ -231,6 +465,8 @@ export default function DataProfiling() {
                       
                     onClick={() => {
                       setSelectedProfile(profile);
+                      setRunFile(csvFilesById.get(profile.id) ?? null);
+                      setRunError('');
                       setShowProfileResults(
                         Boolean(profile.profiled && profile.profileResults)
                       );
@@ -428,11 +664,41 @@ export default function DataProfiling() {
           Ready to profile {selectedProfile.objectName}?
           Click Run profile to view the profiling results.
         </p>
+
+        {selectedProfile.sourceType === 'CSV' && (
+          <label className="data-profiling-field data-profiling-run-file">
+            <span>CSV file</span>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              disabled={running}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                csvFilesById.set(selectedProfile.id, file);
+                setRunFile(file);
+                setRunError('');
+              }}
+            />
+            <small className="data-profiling-file-name">
+              {runFile
+                ? `Selected: ${runFile.name} (${formatFileSize(runFile.size)}). Choose another file to replace it.`
+                : `Choose ${selectedProfile.objectName} again. Files are not kept after the page reloads.`}
+            </small>
+          </label>
+        )}
+
+        {runError && (
+          <p className="data-profiling-run-error" role="alert">
+            {runError}
+          </p>
+        )}
+
         <div className="data-profiling-form-actions">
           <button
             type="button"
             className="data-profiling-cancel-button"
-            onClick={() => setShowRunPrompt(false)}
+            onClick={cancelRunPrompt}
           >
             Cancel
           </button>
@@ -440,8 +706,15 @@ export default function DataProfiling() {
             type="button"
             className="data-profiling-next-button"
             onClick={handleRunProfile}
+            disabled={running}
           >
-            Run profile
+            {running ? (
+              <>
+                <Spinner /> Profiling…
+              </>
+            ) : (
+              'Run profile'
+            )}
           </button>
         </div>
       </section>
@@ -472,7 +745,10 @@ export default function DataProfiling() {
           </button>
         </div>
 
-        
+        {currentProfileResults?.source === 'api' ? (
+          <CsvProfileResults report={currentProfileResults.report} />
+        ) : (
+        <>
         <div className="data-profile-summary">
           <div>
             <span>ROWS</span>
@@ -542,6 +818,8 @@ export default function DataProfiling() {
             </table>
           </div>
         </div>
+        </>
+        )}
       </section>
     )}
 
