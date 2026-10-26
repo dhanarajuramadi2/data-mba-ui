@@ -424,10 +424,13 @@ export default function DataProfiling() {
       <header className="data-profiling-header">
         <h1 className="data-profiling-title">Data Profiling</h1>
 
+        {/* Hidden on an open record, where it would stack the form above it.
+            visibility keeps its space so the header height does not change. */}
         <button
           type="button"
           className="data-profiling-new-button"
           onClick={handleNew}
+          style={showRunPrompt || showProfileResults ? { visibility: 'hidden' } : undefined}
         >
           + New
         </button>
