@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import './Sidebar.css';
 
 const projectItems = [
@@ -12,18 +12,12 @@ const projectItems = [
   { icon: '▣', label: 'Archival' },
 ];
 
-// How long the mouse must rest on an item before its screen opens. Long enough
-// that sweeping the pointer across the sidebar does not switch screens.
-const HOVER_OPEN_DELAY = 300;
-
-function SidebarItem({ icon, label, active = false, onClick, onPointerEnter, onPointerLeave }) {
+function SidebarItem({ icon, label, active = false, onClick }) {
   return (
     <button
       type="button"
       className={`sidebar-item ${active ? 'active' : ''}`}
       onClick={onClick}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
     >
       <span className="sidebar-item-icon">{icon}</span>
       <span className="sidebar-item-label">{label}</span>
@@ -31,30 +25,10 @@ function SidebarItem({ icon, label, active = false, onClick, onPointerEnter, onP
   );
 }
 
-export default function Sidebar({ activeScreen, onNavigate }) {
+export default function Sidebar({ activeScreen, onNavigate, showBackToRecords = false, onBackToRecords }) {
   const [projectsOpen, setProjectsOpen] = useState(
     projectItems.some((item) => item.label === activeScreen)
   );
-  const hoverTimer = useRef(null);
-
-  function cancelHover() {
-    clearTimeout(hoverTimer.current);
-  }
-
-  // Like the Bitrix24 menu: resting the mouse on an item shows its screen.
-  // Touch and pen have no hover, so they keep tap-to-open.
-  function hoverToOpen(open) {
-    return {
-      onPointerEnter: (event) => {
-        if (event.pointerType !== 'mouse') return;
-        cancelHover();
-        hoverTimer.current = setTimeout(open, HOVER_OPEN_DELAY);
-      },
-      onPointerLeave: cancelHover,
-    };
-  }
-
-  useEffect(() => cancelHover, []);
 
   return (
     <aside className="sidebar">
@@ -71,16 +45,24 @@ export default function Sidebar({ activeScreen, onNavigate }) {
         </div>
       </div>
 
+      {/* Shown while a Data Profiling record is open (see App.jsx) */}
+      {showBackToRecords && (
+        <button
+          type="button"
+          className="sidebar-back-button"
+          onClick={onBackToRecords}
+        >
+          <span aria-hidden="true">←</span>
+          Back to records
+        </button>
+      )}
+
       <nav className="sidebar-navigation">
         <SidebarItem
           icon="⌂"
           label="Home"
           active={activeScreen === 'Home'}
-          onClick={() => {
-            cancelHover();
-            onNavigate('Home');
-          }}
-          {...hoverToOpen(() => onNavigate('Home'))}
+          onClick={() => onNavigate('Home')}
         />
 
 
@@ -95,14 +77,9 @@ export default function Sidebar({ activeScreen, onNavigate }) {
         }`}
         aria-expanded={projectsOpen}
         onClick={() => {
-          cancelHover();
           setProjectsOpen((open) => !open);
           onNavigate('Projects');
         }}
-        {...hoverToOpen(() => {
-          setProjectsOpen(true);
-          onNavigate('Projects');
-        })}
       >
         <span className="sidebar-item-icon">▣</span>
         <span className="sidebar-item-label">Projects</span>
@@ -122,11 +99,7 @@ export default function Sidebar({ activeScreen, onNavigate }) {
             key={item.label}
             {...item}
             active={activeScreen === item.label}
-            onClick={() => {
-              cancelHover();
-              onNavigate(item.label);
-            }}
-            {...hoverToOpen(() => onNavigate(item.label))}
+            onClick={() => onNavigate(item.label)}
           />
         ))}
       </div>

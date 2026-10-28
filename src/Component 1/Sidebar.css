@@ -389,3 +389,55 @@
     transform: none;
   }
 }
+
+/* "Back to records" while a Data Profiling record is open */
+.sidebar-back-button {
+  width: 100%;
+  min-height: 38px;
+  margin: -22px 0 14px;
+  padding: 0 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #2d4468;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #dbe7ff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  animation: sidebar-back-in 0.18s ease-out;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.sidebar-back-button:hover {
+  background: #1d304d;
+  border-color: #3d5c8c;
+}
+
+.sidebar-back-button:focus-visible {
+  outline: 2px solid #77a7ff;
+  outline-offset: 2px;
+}
+
+.sidebar-back-button span {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@keyframes sidebar-back-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-back-button {
+    animation: none;
+  }
+}

@@ -1,7 +1,8 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Spinner } from './ui/Feedback';
-import { useFeedback } from './ui/feedbackContext';
+import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 import { profileCsvFile } from '../services/profilingApi';
 import './DataProfiling.css';
 
@@ -170,8 +171,27 @@ function CsvProfileResults({ report }) {
   );
 }
 
-export default function DataProfiling() {
-  const { notify } = useFeedback();
+// onRecordOpenChange(open) and backToRecordsRef let the sidebar show a
+// "Back to records" button while a record is open (see App.jsx).
+export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) {
+  const { notify, confirm } = useFeedback();
+  const [editingId, setEditingId] = useState(null);
+
+  // Row actions menu: { id, top, right } in viewport pixels. The records table
+  // scrolls sideways, which would clip a normal dropdown, so it is fixed.
+  const [rowMenu, setRowMenu] = useState(null);
+  const closeRowMenu = useCallback(() => setRowMenu(null), []);
+  useCloseOnOutsideClick(Boolean(rowMenu), closeRowMenu);
+
+  useEffect(() => {
+    if (!rowMenu) return undefined;
+    window.addEventListener('scroll', closeRowMenu, true);
+    window.addEventListener('resize', closeRowMenu);
+    return () => {
+      window.removeEventListener('scroll', closeRowMenu, true);
+      window.removeEventListener('resize', closeRowMenu);
+    };
+  }, [rowMenu, closeRowMenu]);
   const [showNewForm, setShowNewForm] = useState(false);
   const [sourceType, setSourceType] = useState('Salesforce');
   const [showDetails, setShowDetails] = useState(false);
@@ -214,6 +234,16 @@ export default function DataProfiling() {
 
   // Cancel an in-flight upload if the user leaves the screen
   useEffect(() => () => runController.current?.abort(), []);
+
+  // Escape closes the New profiling modal, like the app's other dialogs
+  useEffect(() => {
+    if (!showNewForm) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowNewForm(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [showNewForm]);
 
   
   const profileColumns = {
@@ -263,6 +293,7 @@ export default function DataProfiling() {
 
   
   const handleNew = () => {
+    setEditingId(null);
     setShowNewForm(true);
     setShowDetails(false);
     setShowSavedList(true);
@@ -282,6 +313,44 @@ export default function DataProfiling() {
     setShowDetails(false);
   };
 
+  const saveEdit = (profile, keepsCurrentFile) => {
+    const fileName = keepsCurrentFile ? profile.sourceConnection : csvFile?.name;
+    const next = {
+      name: name.trim(),
+      sourceType,
+      sourceConnection: sourceType === 'Salesforce' ? sourceConnection : fileName,
+      objectName: sourceType === 'Salesforce' ? objectName : fileName,
+    };
+    const sourceChanged =
+      next.sourceType !== profile.sourceType ||
+      next.sourceConnection !== profile.sourceConnection ||
+      next.objectName !== profile.objectName ||
+      (sourceType === 'CSV' && Boolean(csvFile) && csvFile !== csvFilesById.get(profile.id));
+
+    if (sourceType === 'CSV' && csvFile) csvFilesById.set(profile.id, csvFile);
+    if (sourceType !== 'CSV') csvFilesById.delete(profile.id);
+
+    // Results no longer match a different source, so the profile must run again
+    const updated = {
+      ...profile,
+      ...next,
+      ...(sourceChanged ? { status: 'Saved', profiled: false, profileResults: null } : {}),
+    };
+
+    setSavedProfiles((previousProfiles) =>
+      previousProfiles.map((item) => (item.id === profile.id ? updated : item))
+    );
+    notify(`${updated.name} updated`, {
+      type: 'success',
+      message: sourceChanged ? 'The source changed, so run the profile again.' : undefined,
+    });
+
+    setEditingId(null);
+    setShowNewForm(false);
+    setShowDetails(false);
+    setShowSavedList(true);
+  };
+
   const handleSave = () => {
     if (!name.trim()) {
       notify('Name is required', { type: 'warning', message: 'Give the profile a name.' });
@@ -293,8 +362,19 @@ export default function DataProfiling() {
       return;
     }
 
-    if (sourceType === 'CSV' && !csvFile) {
+    const editingProfile = editingId
+      ? savedProfiles.find((profile) => profile.id === editingId)
+      : null;
+    // When editing a CSV profile, keeping the current file is allowed
+    const keepsCurrentFile = editingProfile?.sourceType === 'CSV' && !csvFile;
+
+    if (sourceType === 'CSV' && !csvFile && !keepsCurrentFile) {
       notify('CSV file missing', { type: 'warning', message: 'Upload a CSV file to profile.' });
+      return;
+    }
+
+    if (editingProfile) {
+      saveEdit(editingProfile, keepsCurrentFile);
       return;
     }
 
@@ -322,6 +402,64 @@ export default function DataProfiling() {
     setShowNewForm(false);
     setShowDetails(false);
     setShowSavedList(true);
+  };
+
+  const openRecord = (profile) => {
+    setSelectedProfile(profile);
+    setRunFile(csvFilesById.get(profile.id) ?? null);
+    setRunError('');
+    setShowProfileResults(Boolean(profile.profiled && profile.profileResults));
+    setShowRunPrompt(!(profile.profiled && profile.profileResults));
+    setShowNewForm(false);
+    setShowSavedList(false);
+  };
+
+  const handleEdit = (profile) => {
+    setEditingId(profile.id);
+    setSourceType(profile.sourceType);
+    setName(profile.name);
+    setSourceConnection(profile.sourceType === 'Salesforce' ? profile.sourceConnection : '');
+    setObjectName(profile.sourceType === 'Salesforce' ? profile.objectName : '');
+    setCsvFile(null);
+    setShowDetails(true);
+    setShowNewForm(true);
+  };
+
+  const handleDelete = async (profile) => {
+    const ok = await confirm({
+      title: `Delete ${profile.name}?`,
+      message: profile.sourceType === 'CSV'
+        ? 'The profile and its saved results are removed. The CSV file on your computer is not affected.'
+        : 'The profile and its saved results are removed.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    csvFilesById.delete(profile.id);
+    setSavedProfiles((previousProfiles) =>
+      previousProfiles.filter((item) => item.id !== profile.id)
+    );
+    notify(`Deleted ${profile.name}`);
+  };
+
+  const menuProfile = rowMenu
+    ? savedProfiles.find((profile) => profile.id === rowMenu.id)
+    : null;
+
+  const runRowAction = (action) => {
+    setRowMenu(null);
+    action(menuProfile);
+  };
+
+  const toggleRowMenu = (event, profile) => {
+    event.stopPropagation();
+    if (rowMenu?.id === profile.id) {
+      setRowMenu(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setRowMenu({ id: profile.id, top: rect.bottom + 4, right: window.innerWidth - rect.right });
   };
 
   
@@ -417,6 +555,29 @@ export default function DataProfiling() {
     setShowSavedList(true);
   };
 
+  const closeResults = () => {
+    setShowProfileResults(false);
+    setShowSavedList(true);
+    setSelectedProfile(null);
+  };
+
+  const recordOpen = Boolean(selectedProfile) && (showRunPrompt || showProfileResults);
+
+  useEffect(() => {
+    onRecordOpenChange?.(recordOpen);
+  }, [recordOpen, onRecordOpenChange]);
+
+  // Hide the sidebar button when leaving this screen
+  useEffect(() => () => onRecordOpenChange?.(false), [onRecordOpenChange]);
+
+  useEffect(() => {
+    if (!backToRecordsRef) return undefined;
+    backToRecordsRef.current = () => (showRunPrompt ? cancelRunPrompt() : closeResults());
+    return () => {
+      backToRecordsRef.current = null;
+    };
+  });
+
 
 
   return (
@@ -436,7 +597,7 @@ export default function DataProfiling() {
         </button>
       </header>
 
-      {showSavedList && !showNewForm && !showRunPrompt && !showProfileResults && (
+      {showSavedList && !showRunPrompt && !showProfileResults && (
       <section className="data-profiling-records">
         <div className="data-profiling-list-header">
           <div>
@@ -455,6 +616,7 @@ export default function DataProfiling() {
                 <th>Table / Object</th>
                 <th>Status</th>
                 <th>Created</th>
+                <th className="data-profiling-actions-cell" aria-label="Actions" />
               </tr>
             </thead>
 
@@ -465,21 +627,7 @@ export default function DataProfiling() {
                     <button
                       type="button"
                       className="data-profiling-record-link"
-                      
-                    onClick={() => {
-                      setSelectedProfile(profile);
-                      setRunFile(csvFilesById.get(profile.id) ?? null);
-                      setRunError('');
-                      setShowProfileResults(
-                        Boolean(profile.profiled && profile.profileResults)
-                      );
-                      setShowRunPrompt(
-                        !(profile.profiled && profile.profileResults)
-                      );
-                      setShowNewForm(false);
-                      setShowSavedList(false);
-                    }}
-
+                      onClick={() => openRecord(profile)}
                     >
                       {profile.name}
                     </button>
@@ -493,6 +641,18 @@ export default function DataProfiling() {
                     </span>
                   </td>
                   <td>{profile.createdAt}</td>
+                  <td className="data-profiling-actions-cell">
+                    <button
+                      type="button"
+                      className={`data-profiling-row-menu-button ${rowMenu?.id === profile.id ? 'open' : ''}`}
+                      aria-label={`Actions for ${profile.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={rowMenu?.id === profile.id}
+                      onClick={(event) => toggleRowMenu(event, profile)}
+                    >
+                      ⋮
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -501,10 +661,37 @@ export default function DataProfiling() {
       </section>
     )}
 
-      {showNewForm && (
-        <section className="data-profiling-form">
+      {menuProfile && createPortal(
+        <div
+          className="data-profiling-row-menu ui-popup-menu"
+          role="menu"
+          style={{ top: rowMenu.top, right: rowMenu.right }}
+        >
+          <button type="button" role="menuitem" onClick={() => runRowAction(openRecord)}>
+            {menuProfile.profiled && menuProfile.profileResults ? 'View results' : 'Run profile'}
+          </button>
+          <button type="button" role="menuitem" onClick={() => runRowAction(handleEdit)}>
+            Edit
+          </button>
+          <button type="button" role="menuitem" className="danger" onClick={() => runRowAction(handleDelete)}>
+            Delete
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {showNewForm && createPortal(
+        <div className="data-profiling-modal-backdrop">
+        <section
+          className="data-profiling-form data-profiling-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="data-profiling-modal-title"
+        >
           <div className="data-profiling-form-header">
-            <h2>{showDetails ? 'New Data Profiling' : 'Select Source Type'}</h2>
+            <h2 id="data-profiling-modal-title">
+              {editingId ? 'Edit Data Profiling' : showDetails ? 'New Data Profiling' : 'Select Source Type'}
+            </h2>
 
             <button
               type="button"
@@ -634,6 +821,12 @@ export default function DataProfiling() {
                         Selected: {csvFile.name}
                       </small>
                     )}
+                    {!csvFile && editingId && savedProfiles.find((profile) => profile.id === editingId)?.sourceType === 'CSV' && (
+                      <small className="data-profiling-file-name">
+                        Current file: {savedProfiles.find((profile) => profile.id === editingId).sourceConnection}.
+                        Choose a file only to replace it.
+                      </small>
+                    )}
                   </label>
                 )}
               </div>
@@ -658,17 +851,38 @@ export default function DataProfiling() {
             </>
           )}
         </section>
+        </div>,
+        document.body
       )}
       
     {showRunPrompt && selectedProfile && (
       <section className="data-profiling-run-prompt">
+        <span className="data-profiling-run-eyebrow">Run profile</span>
         <h2>{selectedProfile.name}</h2>
-        <p>
-          Ready to profile {selectedProfile.objectName}?
-          Click Run profile to view the profiling results.
-        </p>
 
-        {selectedProfile.sourceType === 'CSV' && (
+        {selectedProfile.sourceType !== 'CSV' && (
+          <p>
+            Ready to profile {selectedProfile.objectName}?
+            Click Run profile to view the profiling results.
+          </p>
+        )}
+
+        {selectedProfile.sourceType === 'CSV' && runFile && (
+          <>
+            <div className="data-profiling-run-source">
+              <span>File (CSV)</span>
+              <strong>{runFile.name}</strong>
+              <small>{formatFileSize(runFile.size)}</small>
+            </div>
+            <p>
+              Click Run profile to check row counts, missing values,
+              duplicates and column statistics.
+            </p>
+          </>
+        )}
+
+        {/* The browser cannot keep the file after a page reload, so only then ask for it again */}
+        {selectedProfile.sourceType === 'CSV' && !runFile && (
           <label className="data-profiling-field data-profiling-run-file">
             <span>CSV file</span>
             <input
@@ -684,9 +898,7 @@ export default function DataProfiling() {
               }}
             />
             <small className="data-profiling-file-name">
-              {runFile
-                ? `Selected: ${runFile.name} (${formatFileSize(runFile.size)}). Choose another file to replace it.`
-                : `Choose ${selectedProfile.objectName} again. Files are not kept after the page reloads.`}
+              {`Choose ${selectedProfile.objectName} again. Files are not kept after the page reloads.`}
             </small>
           </label>
         )}
@@ -738,11 +950,7 @@ export default function DataProfiling() {
           <button
             type="button"
             className="data-profiling-next-button"
-            onClick={() => {
-              setShowProfileResults(false);
-              setShowSavedList(true);
-              setSelectedProfile(null);
-            }}
+            onClick={closeResults}
           >
             Back to records
           </button>
