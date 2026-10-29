@@ -1742,3 +1742,13 @@ input {
     transform: none;
   }
 }
+
+
+/* Table cells: left-align under their headers (the page default is centred) */
+.connections-page .connections-table td {
+  text-align: left;
+}
+
+.connections-page .connections-table td.row-menu-cell {
+  text-align: center;
+}

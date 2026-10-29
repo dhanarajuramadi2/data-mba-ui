@@ -13,12 +13,20 @@ import Reconciliation from './Component 1/Reconciliation';
 import Files from './Component 1/Files';
 import Home from './Component 1/Home';
 import Projects from './Component 1/Projects';
+import ProjectConnections from './Component 1/ProjectConnections';
 import Archival from './Component 1/Archival';
 
-function renderScreen(activeScreen, onNavigate, profiling) {
+function renderScreen(activeScreen, onNavigate, profiling, projectNav) {
   switch (activeScreen) {
     case 'Projects':
-      return <Projects />;
+      return projectNav.openProjectId !== null ? (
+        <ProjectConnections
+          projectId={projectNav.openProjectId}
+          onBack={() => projectNav.setOpenProjectId(null)}
+        />
+      ) : (
+        <Projects onOpenProject={projectNav.setOpenProjectId} />
+      );
     case 'Files':
       return <Files />;
     case 'Reconciliation':
@@ -48,23 +56,31 @@ export default function App() {
   const [profilingRecordOpen, setProfilingRecordOpen] = useState(false);
   const profilingBackRef = useRef(null);
 
+  // Project whose Source/Target connections are open (null = project list)
+  const [openProjectId, setOpenProjectId] = useState(null);
+
+  const navigate = (screen) => {
+    setOpenProjectId(null);
+    setActiveScreen(screen);
+  };
+
   return (
     <FeedbackProvider>
       <div className="app-shell">
         <Sidebar
           activeScreen={activeScreen}
-          onNavigate={setActiveScreen}
+          onNavigate={navigate}
           showBackToRecords={activeScreen === 'Data Profiling' && profilingRecordOpen}
           onBackToRecords={() => profilingBackRef.current?.()}
         />
 
         <main className="main-content">
           {/* key replays the fade-in animation each time the screen changes */}
-          <div key={activeScreen} className="screen-enter">
-            {renderScreen(activeScreen, setActiveScreen, {
+          <div key={`${activeScreen}-${openProjectId ?? ''}`} className="screen-enter">
+            {renderScreen(activeScreen, navigate, {
               onRecordOpenChange: setProfilingRecordOpen,
               backToRecordsRef: profilingBackRef,
-            })}
+            }, { openProjectId, setOpenProjectId })}
           </div>
         </main>
       </div>

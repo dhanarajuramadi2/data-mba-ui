@@ -624,6 +624,107 @@
   box-shadow: 0 7px 14px rgba(22, 143, 229, 0.3);
 }
 
+/* Project name opens the project's connections */
+.project-title-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.project-title-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* Project card menu: Edit / Delete with icons */
+.project-options-menu {
+  min-width: 150px;
+  padding: 6px;
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(15, 35, 75, 0.16);
+}
+
+.project-options-menu button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.project-options-menu button svg {
+  flex-shrink: 0;
+}
+
+/* Sort button and dropdown */
+.projects-sort-wrap {
+  position: relative;
+}
+
+button.projects-sort {
+  gap: 10px;
+  padding: 0 14px;
+  border-color: #e3e8ef;
+  background: #f3f4f6;
+  color: #64748b;
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.projects-sort:hover,
+button.projects-sort.open {
+  background: #eceff3;
+}
+
+.projects-sort-icon {
+  flex-shrink: 0;
+}
+
+.projects-sort-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 200px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e3e8ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(15, 35, 75, 0.14);
+}
+
+.projects-sort-menu button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.projects-sort-menu button:hover,
+.projects-sort-menu button:focus-visible {
+  outline: none;
+  background: #f1f5fb;
+}
+
+.projects-sort-menu button.active {
+  background: #e8f1ff;
+  color: #0b5cd5;
+  font-weight: 600;
+}
+
 /* Project list */
 .projects-list {
   padding: 16px 18px;

@@ -4,12 +4,15 @@ import { createPortal } from 'react-dom';
 import { Spinner } from './ui/Feedback';
 import { useCloseOnOutsideClick, useFeedback } from './ui/feedbackContext';
 import { profileCsvFile } from '../services/profilingApi';
+import { deleteCsvFile, loadCsvFile, saveCsvFile } from '../services/csvFileStore';
 import './DataProfiling.css';
 
-// Selected CSV files by profile id. Saved profiles live in localStorage, which
-// cannot hold files, so the file is kept here for this browser session (it
-// survives switching screens, not a page reload).
+// Selected CSV files by profile id. Each file is also saved in the browser
+// (see csvFileStore) so a record can still run after a page reload; this Map
+// is the in-memory copy.
 const csvFilesById = new Map();
+
+const MIN_SPINNER_MS = 1000;
 
 const formatNumber = (value) =>
   value === null || value === undefined
@@ -230,7 +233,10 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
   const [runFile, setRunFile] = useState(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState('');
+  const [runFileLoading, setRunFileLoading] = useState(false);
+  const openRecordId = useRef(null);
   const runController = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Cancel an in-flight upload if the user leaves the screen
   useEffect(() => () => runController.current?.abort(), []);
@@ -327,8 +333,14 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
       next.objectName !== profile.objectName ||
       (sourceType === 'CSV' && Boolean(csvFile) && csvFile !== csvFilesById.get(profile.id));
 
-    if (sourceType === 'CSV' && csvFile) csvFilesById.set(profile.id, csvFile);
-    if (sourceType !== 'CSV') csvFilesById.delete(profile.id);
+    if (sourceType === 'CSV' && csvFile) {
+      csvFilesById.set(profile.id, csvFile);
+      saveCsvFile(profile.id, csvFile);
+    }
+    if (sourceType !== 'CSV') {
+      csvFilesById.delete(profile.id);
+      deleteCsvFile(profile.id);
+    }
 
     // Results no longer match a different source, so the profile must run again
     const updated = {
@@ -392,7 +404,10 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
       profileResults: null,
     };
 
-    if (sourceType === 'CSV') csvFilesById.set(newProfile.id, csvFile);
+    if (sourceType === 'CSV') {
+      csvFilesById.set(newProfile.id, csvFile);
+      saveCsvFile(newProfile.id, csvFile);
+    }
 
     setSavedProfiles((previousProfiles) => [
       ...previousProfiles,
@@ -405,9 +420,23 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
   };
 
   const openRecord = (profile) => {
+    const fileInMemory = csvFilesById.get(profile.id) ?? null;
+    openRecordId.current = profile.id;
     setSelectedProfile(profile);
-    setRunFile(csvFilesById.get(profile.id) ?? null);
+    setRunFile(fileInMemory);
+    setRunFileLoading(profile.sourceType === 'CSV' && !fileInMemory);
     setRunError('');
+
+    if (profile.sourceType === 'CSV' && !fileInMemory) {
+      loadCsvFile(profile.id).then((file) => {
+        if (file) csvFilesById.set(profile.id, file);
+        // Ignore the result if another record was opened meanwhile
+        if (openRecordId.current !== profile.id) return;
+        setRunFile(file);
+        setRunFileLoading(false);
+      });
+    }
+
     setShowProfileResults(Boolean(profile.profiled && profile.profileResults));
     setShowRunPrompt(!(profile.profiled && profile.profileResults));
     setShowNewForm(false);
@@ -437,6 +466,7 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
     if (!ok) return;
 
     csvFilesById.delete(profile.id);
+    deleteCsvFile(profile.id);
     setSavedProfiles((previousProfiles) =>
       previousProfiles.filter((item) => item.id !== profile.id)
     );
@@ -484,11 +514,11 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
     setShowProfileResults(true);
   };
 
-  const runCsvProfile = async (profile) => {
-    const file = csvFilesById.get(profile.id);
+  const runCsvProfile = async (profile, pickedFile) => {
+    const file = pickedFile ?? runFile ?? csvFilesById.get(profile.id);
 
     if (!file) {
-      setRunError('Choose the CSV file to profile.');
+      fileInputRef.current?.click();
       return;
     }
 
@@ -498,8 +528,14 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
     setRunError('');
 
     try {
+      const startedAt = Date.now();
       const response = await profileCsvFile(file, { signal: controller.signal });
       const report = response.profiling_report;
+
+      // A fast local backend would otherwise flash the spinner for a few ms
+      const remaining = MIN_SPINNER_MS - (Date.now() - startedAt);
+      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      if (controller.signal.aborted) return;
 
       showResults(profile, {
         source: 'api',
@@ -522,6 +558,18 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
         setRunning(false);
       }
     }
+  };
+
+  // Only reached when the record's file is no longer stored in this browser
+  const handleRunFilePicked = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !selectedProfile) return;
+
+    csvFilesById.set(selectedProfile.id, file);
+    saveCsvFile(selectedProfile.id, file);
+    setRunFile(file);
+    runCsvProfile(selectedProfile, file);
   };
 
   const handleRunProfile = () => {
@@ -857,6 +905,15 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
       
     {showRunPrompt && selectedProfile && (
       <section className="data-profiling-run-prompt">
+        {running && (
+          <div className="data-profiling-run-overlay" role="status" aria-label="Profiling">
+            <span className="data-profiling-dots">
+              {[0, 1, 2, 3, 4, 5].map((dot) => (
+                <i key={dot} />
+              ))}
+            </span>
+          </div>
+        )}
         <span className="data-profiling-run-eyebrow">Run profile</span>
         <h2>{selectedProfile.name}</h2>
 
@@ -867,40 +924,25 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
           </p>
         )}
 
-        {selectedProfile.sourceType === 'CSV' && runFile && (
+        {selectedProfile.sourceType === 'CSV' && (
           <>
             <div className="data-profiling-run-source">
               <span>File (CSV)</span>
-              <strong>{runFile.name}</strong>
-              <small>{formatFileSize(runFile.size)}</small>
+              <strong>{runFile?.name ?? selectedProfile.objectName}</strong>
+              {runFile && <small>{formatFileSize(runFile.size)}</small>}
             </div>
             <p>
               Click Run profile to check row counts, missing values,
               duplicates and column statistics.
             </p>
-          </>
-        )}
-
-        {/* The browser cannot keep the file after a page reload, so only then ask for it again */}
-        {selectedProfile.sourceType === 'CSV' && !runFile && (
-          <label className="data-profiling-field data-profiling-run-file">
-            <span>CSV file</span>
             <input
+              ref={fileInputRef}
               type="file"
               accept=".csv,text/csv"
-              disabled={running}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                csvFilesById.set(selectedProfile.id, file);
-                setRunFile(file);
-                setRunError('');
-              }}
+              hidden
+              onChange={handleRunFilePicked}
             />
-            <small className="data-profiling-file-name">
-              {`Choose ${selectedProfile.objectName} again. Files are not kept after the page reloads.`}
-            </small>
-          </label>
+          </>
         )}
 
         {runError && (
@@ -921,7 +963,7 @@ export default function DataProfiling({ onRecordOpenChange, backToRecordsRef }) 
             type="button"
             className="data-profiling-next-button"
             onClick={handleRunProfile}
-            disabled={running}
+            disabled={running || runFileLoading}
           >
             {running ? (
               <>
